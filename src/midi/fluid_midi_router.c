@@ -513,7 +513,7 @@ fluid_midi_router_rule_set_param2 (fluid_midi_router_rule_t *rule, int min, int 
  * - ...
  */
 int
-fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
+fluid_midi_router_handle_midi_event (void* data, fluid_event_t* event)
 {
   fluid_midi_router_t* router = (fluid_midi_router_t *)data;
   fluid_midi_router_rule_t **rulep, *rule, *next_rule, *prev_rule = NULL;
@@ -522,54 +522,52 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
   int par2_max = 127;     /* Range limit for par2 */
   int ret_val = FLUID_OK;
 
-  int chan; /* Channel of the generated event */
-  int par1; /* par1 of the generated event */
-  int par2;
-  int event_par1;
-  int event_par2;
-  fluid_midi_event_t new_event;
+  int type = fluid_event_get_type(event);
+  int chan = fluid_event_get_channel(event);
+  short par1;
+  short par2;
+  fluid_event_t new_event;
 
   /* Some keyboards report noteoff through a noteon event with vel=0.
    * Convert those to noteoff to ease processing. */
-  if (event->type == NOTE_ON && event->param2 == 0)
+  if (type == FLUID_SEQ_NOTEON && fluid_event_get_velocity(event) == 0)
   {
-    event->type = NOTE_OFF;
-    event->param2 = 127;        /* Release velocity */
+      fluid_event_noteoff(event, chan, fluid_event_get_key(event));
   }
 
   fluid_mutex_lock (router->rules_mutex);   /* ++ lock rules */
 
   /* Depending on the event type, choose the correct list of rules. */
-  switch (event->type)
+  switch (type)
   {
-      case NOTE_ON:
+      case FLUID_SEQ_NOTEON:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_NOTE];
 	event_has_par2 = 1;
 	break;
-      case NOTE_OFF:
+      case FLUID_SEQ_NOTEOFF:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_NOTE];
 	event_has_par2 = 1;
 	break;
-      case CONTROL_CHANGE:
+      case FLUID_SEQ_CONTROLCHANGE:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_CC];
 	event_has_par2 = 1;
 	break;
-      case PROGRAM_CHANGE:
+      case FLUID_SEQ_PROGRAMCHANGE:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_PROG_CHANGE];
 	break;
-      case PITCH_BEND:
+      case FLUID_SEQ_PITCHBEND:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_PITCH_BEND];
 	par1_max = 16383;
 	break;
-      case CHANNEL_PRESSURE:
+      case FLUID_SEQ_CHANNELPRESSURE:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_CHANNEL_PRESSURE];
 	break;
-      case KEY_PRESSURE:
+      case FLUID_SEQ_KEYPRESSURE:
 	rulep = &router->rules[FLUID_MIDI_ROUTER_RULE_KEY_PRESSURE];
 	event_has_par2 = 1;
 	break;
-      case MIDI_SYSTEM_RESET:
-      case MIDI_SYSEX:
+      case FLUID_SEQ_SYSTEMRESET:
+      case FLUID_SEQ_SYSEX:
         ret_val = router->event_handler (router->event_handler_data,event);
         fluid_mutex_unlock (router->rules_mutex);  /* -- unlock rules */
         return ret_val;
@@ -581,34 +579,35 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
   /* Loop over rules in the list, looking for matches for this event. */
   for (rule = rulep ? *rulep : NULL; rule; prev_rule = rule, rule = next_rule)
   {
-    event_par1 = (int)event->param1;
-    event_par2 = (int)event->param2;
     next_rule = rule->next;     /* Rule may get removed from list, so get next here */
-
+    
+    chan = fluid_event_get_channel(event);
     /* Channel window */
     if (rule->chan_min > rule->chan_max)
     { /* Inverted rule: Exclude everything between max and min (but not min/max) */
-      if (event->channel > rule->chan_max && event->channel < rule->chan_min)
+      if (chan > rule->chan_max && chan < rule->chan_min)
 	continue;
     }
     else        /* Normal rule: Exclude everything < max or > min (but not min/max) */
     {
-      if (event->channel > rule->chan_max || event->channel < rule->chan_min)
+      if (chan > rule->chan_max || chan < rule->chan_min)
 	continue;
     }
 
+    par1 = event->param1.key;
     /* Par 1 window */
     if (rule->par1_min > rule->par1_max)
     { /* Inverted rule: Exclude everything between max and min (but not min/max) */
-      if (event_par1 > rule->par1_max && event_par1 < rule->par1_min)
+      if (par1 > rule->par1_max && par1 < rule->par1_min)
 	continue;
     }
     else        /* Normal rule: Exclude everything < max or > min (but not min/max)*/
     {
-      if (event_par1 > rule->par1_max || event_par1 < rule->par1_min)
+      if (par1 > rule->par1_max || par1 < rule->par1_min)
 	continue;
     }
 
+    par2 = event->param2.value;
     /* Par 2 window (only applies to event types, which have 2 pars)
      * For noteoff events, velocity switching doesn't make any sense.
      * Velocity scaling might be useful, though.
@@ -617,12 +616,12 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
     {
       if (rule->par2_min > rule->par2_max)
       { /* Inverted rule: Exclude everything between max and min (but not min/max) */
-	if (event_par2 > rule->par2_max && event_par2 < rule->par2_min)
+	if (par2 > rule->par2_max && par2 < rule->par2_min)
 	  continue;
       }
       else      /* Normal rule: Exclude everything < max or > min (but not min/max)*/
       {
-	if (event_par2 > rule->par2_max || event_par2 < rule->par2_min)
+	if (par2 > rule->par2_max || par2 < rule->par2_min)
 	  continue;
       }
     }
@@ -631,16 +630,16 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
      * Note: rule->chan_mul will probably be 0 or 1. If it's 0, input from all
      * input channels is mapped to the same synth channel.
      */
-    chan = (int)((fluid_real_t)event->channel * (fluid_real_t)rule->chan_mul
+    chan = (int)((fluid_real_t)chan * (fluid_real_t)rule->chan_mul
                  + (fluid_real_t)rule->chan_add + 0.5);
 
     /* Par 1 scaling / offset */
-    par1 = (int)((fluid_real_t)event_par1 * (fluid_real_t)rule->par1_mul
+    par1 = (short)((fluid_real_t)par1 * (fluid_real_t)rule->par1_mul
                  + (fluid_real_t)rule->par1_add + 0.5);
 
     /* Par 2 scaling / offset, if applicable */
     if (event_has_par2)
-      par2 = (int)((fluid_real_t)event_par2 * (fluid_real_t)rule->par2_mul
+      par2 = (short)((fluid_real_t)par2 * (fluid_real_t)rule->par2_mul
                    + (fluid_real_t)rule->par2_add + 0.5);
     else par2 = 0;
 
@@ -671,7 +670,7 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
      * arrived. In the meantime while waiting, it will only let through 'negative' events
      * (noteoff or pedal up).
      */
-    if (event->type == NOTE_ON || (event->type == CONTROL_CHANGE
+    if (type == FLUID_SEQ_NOTEON || (type == FLUID_SEQ_CONTROLCHANGE
                                    && par1 == SUSTAIN_SWITCH && par2 >= 64))
     {
       /* Noteon or sustain pedal down event generated */
@@ -681,7 +680,7 @@ fluid_midi_router_handle_midi_event (void* data, fluid_midi_event_t* event)
 	rule->pending_events++;
       }
     }
-    else if (event->type == NOTE_OFF || (event->type == CONTROL_CHANGE
+    else if (type == FLUID_SEQ_NOTEOFF || (type == FLUID_SEQ_CONTROLCHANGE
                                          && par1 == SUSTAIN_SWITCH && par2 < 64))
     { /* Noteoff or sustain pedal up event generated */
       if (rule->keys_cc[par1] > 0)
@@ -718,10 +717,10 @@ send_event:
     /* At this point it is decided, what is sent to the synth.
      * Create a new event and make the appropriate call */
 
-    fluid_midi_event_set_type (&new_event, event->type);
-    fluid_midi_event_set_channel (&new_event, chan);
-    new_event.param1 = par1;
-    new_event.param2 = par2;
+    fluid_event_clone(&new_event, event);
+    new_event->channel = chan;
+    memcpy(&new_event.param1, &par1);
+    memcpy(&new_event.param2, &par2);
 
     /* FIXME - What should be done on failure?  For now continue to process events, but return failure to caller. */
     if (router->event_handler (router->event_handler_data, &new_event) != FLUID_OK)

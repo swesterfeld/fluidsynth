@@ -36,6 +36,7 @@ struct _fluid_event_t {
     {
         short key;
         short control;
+        short pitch;
     } param1;
     
     union
@@ -43,7 +44,6 @@ struct _fluid_event_t {
         short vel;
         short value;
         short id; //?? unused ?
-        short pitch;
     } param2;
     
 	unsigned int duration;
