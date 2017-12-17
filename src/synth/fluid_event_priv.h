@@ -26,19 +26,26 @@
 #include "fluid_sys.h"
 
 /* Private data for event */
-/* ?? should be optimized in size, using unions */
 struct _fluid_event_t {
 	unsigned int time;
 	int type;
 	fluid_seq_id_t src;
 	fluid_seq_id_t dest;
 	int channel;
-	short key;
-	short vel;
-	short control;
-	short value;
-	short id; //?? unused ?
-	int pitch;
+    union
+    {
+        short key;
+        short control;
+    } param1;
+    
+    union
+    {
+        short vel;
+        short value;
+        short id; //?? unused ?
+        short pitch;
+    } param2;
+    
 	unsigned int duration;
 	void* data;
 };
