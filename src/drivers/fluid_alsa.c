@@ -1021,7 +1021,7 @@ fluid_alsa_seq_run(void* d)
 {
   int n, ev;
   snd_seq_event_t *seq_ev;
-  fluid_midi_event_t evt;
+  fluid_event_t* evt = new_fluid_event();
   fluid_alsa_seq_driver_t* dev = (fluid_alsa_seq_driver_t*) d;
 
   /* go into a loop until someone tells us to stop */
@@ -1053,51 +1053,51 @@ fluid_alsa_seq_run(void* d)
 	    switch (seq_ev->type)
 	    {
 	    case SND_SEQ_EVENT_NOTEON:
-	      evt.type = NOTE_ON;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.note.channel;
-	      evt.param1 = seq_ev->data.note.note;
-	      evt.param2 = seq_ev->data.note.velocity;
+            fluid_event_noteon(evt,
+                               seq_ev->dest.port * 16 + seq_ev->data.note.channel,
+                               seq_ev->data.note.note,
+                               seq_ev->data.note.velocity);
 	      break;
 	    case SND_SEQ_EVENT_NOTEOFF:
-	      evt.type = NOTE_OFF;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.note.channel;
-	      evt.param1 = seq_ev->data.note.note;
-	      evt.param2 = seq_ev->data.note.velocity;
+            fluid_event_noteoff(evt,
+                                seq_ev->dest.port * 16 + seq_ev->data.note.channel,
+                                seq_ev->data.note.note);
+//                                 seq_ev->data.note.velocity);
 	      break;
 	    case SND_SEQ_EVENT_KEYPRESS:
-	      evt.type = KEY_PRESSURE;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.note.channel;
-	      evt.param1 = seq_ev->data.note.note;
-	      evt.param2 = seq_ev->data.note.velocity;
+            fluid_event_key_pressure(evt,
+                                     seq_ev->dest.port * 16 + seq_ev->data.note.channel,
+                                     seq_ev->data.note.note,
+                                     seq_ev->data.note.velocity);
 	      break;
 	    case SND_SEQ_EVENT_CONTROLLER:
-	      evt.type = CONTROL_CHANGE;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.control.channel;
-	      evt.param1 = seq_ev->data.control.param;
-	      evt.param2 = seq_ev->data.control.value;
+            fluid_event_control_change(evt,
+                                       seq_ev->dest.port * 16 + seq_ev->data.control.channel,
+                                       seq_ev->data.control.param,
+                                       seq_ev->data.control.value);
 	      break;
 	    case SND_SEQ_EVENT_PITCHBEND:
-	      evt.type = PITCH_BEND;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.control.channel;
-
-	      /* ALSA pitch bend is -8192 - 8191, we adjust it here */
-	      evt.param1 = seq_ev->data.control.value + 8192;
+            fluid_event_pitch_bend(evt,
+                                   seq_ev->dest.port * 16 + seq_ev->data.control.channel,
+                                   /* ALSA pitch bend is -8192 - 8191, we adjust it here */
+                                   seq_ev->data.control.value + 8192);
 	      break;
 	    case SND_SEQ_EVENT_PGMCHANGE:
-	      evt.type = PROGRAM_CHANGE;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.control.channel;
-	      evt.param1 = seq_ev->data.control.value;
+            fluid_event_program_change(evt,
+                                       seq_ev->dest.port * 16 + seq_ev->data.control.channel,
+                                       seq_ev->data.control.value);
 	      break;
 	    case SND_SEQ_EVENT_CHANPRESS:
-	      evt.type = CHANNEL_PRESSURE;
-	      evt.channel = seq_ev->dest.port * 16 + seq_ev->data.control.channel;
-	      evt.param1 = seq_ev->data.control.value;
+            fluid_event_channel_pressure(evt,
+                                         seq_ev->dest.port * 16 + seq_ev->data.control.channel,
+                                         seq_ev->data.control.value);
 	      break;
 	    case SND_SEQ_EVENT_SYSEX:
 	      if (seq_ev->data.ext.len < 2) continue;
 
-	      fluid_midi_event_set_sysex (&evt, (char *)(seq_ev->data.ext.ptr) + 1,
-					  seq_ev->data.ext.len - 2, FALSE);
+	      fluid_event_sysex (evt,
+                             (char *)(seq_ev->data.ext.ptr) + 1,
+                             seq_ev->data.ext.len - 2, FALSE);
 	      break;
 	    case SND_SEQ_EVENT_PORT_START: {
 	      if (dev->autoconn_inputs) {
@@ -1110,12 +1110,13 @@ fluid_alsa_seq_run(void* d)
 	    }
 
 	    /* send the events to the next link in the chain */
-	    (*dev->driver.handler)(dev->driver.data, &evt);
+	    (*dev->driver.handler)(dev->driver.data, evt);
 	}
 	while (ev > 0);
     }	/* if poll() > 0 */
   }	/* while (!dev->should_quit) */
 
+  delete_fluid_event(evt);
   return FLUID_THREAD_RETURN_VALUE;
 }
 
