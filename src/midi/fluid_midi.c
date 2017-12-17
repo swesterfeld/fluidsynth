@@ -1906,6 +1906,8 @@ new_fluid_midi_parser ()
         return NULL;
     }
     parser->status = 0; /* As long as the status is 0, the parser won't do anything -> no need to initialize all the fields. */
+    fluid_event_clear(&parser->event);
+    
     return parser;
 }
 
@@ -1935,24 +1937,25 @@ delete_fluid_midi_parser(fluid_midi_parser_t *parser)
  * int ret=FLUID_OK;
  * for (i = 0; i < length_of_byte_stream && ret == FLUID_OK; i++)
  * {
- *     fluid_midi_event_t* event = fluid_midi_parser_parse(parser, my_byte_stream[i]);
+ *     fluid_event_t* event = fluid_midi_parser_parse(parser, my_byte_stream[i]);
  *     if (event != NULL)
  *     {
- *         ret = fluid_sequencer_add_midi_event_to_buffer(seq, event);
+ *         fluid_event_set_dest(&evt, some_seq_id);
+ *         ret = fluid_sequencer_send_now(seq, event);
  *     }
  * }
  * @endcode
  */
-fluid_midi_event_t *
+fluid_event_t *
 fluid_midi_parser_parse(fluid_midi_parser_t *parser, unsigned char c)
 {
-    fluid_midi_event_t *event;
+    int chan, param1, param2;
 
     /* Real-time messages (0xF8-0xFF) can occur anywhere, even in the middle
      * of another message. */
     if (c >= 0xF8) {
         if (c == MIDI_SYSTEM_RESET) {
-            parser->event.type = c;
+            fluid_event_system_reset(parser->event);
             parser->status = 0; /* clear the status */
             return &parser->event;
         }
@@ -1962,10 +1965,11 @@ fluid_midi_parser_parse(fluid_midi_parser_t *parser, unsigned char c)
 
     /* Status byte? - If previous message not yet complete, it is discarded (re-sync). */
     if (c & 0x80) {
+        fluid_event_t *event;
         /* Any status byte terminates SYSEX messages (not just 0xF7) */
         if (parser->status == MIDI_SYSEX && parser->nr_bytes > 0) {
             event = &parser->event;
-            fluid_midi_event_set_sysex(event, parser->data, parser->nr_bytes,
+            fluid_event_sysex(event, parser->data, parser->nr_bytes,
                     FALSE);
         } else
             event = NULL;
@@ -2010,23 +2014,33 @@ fluid_midi_parser_parse(fluid_midi_parser_t *parser, unsigned char c)
 
     /* Event is complete, return it.
      * Running status byte MIDI feature is also handled here. */
-    parser->event.type = parser->status;
-    parser->event.channel = parser->channel;
+    chan = parser->channel;
+    param1 = parser->data[0];
+    param2 = parser->data[1];
     parser->nr_bytes = 0; /* Reset data size, in case there are additional running status messages */
 
     switch (parser->status) {
         case NOTE_OFF:
+            fluid_event_noteoff(&parser->event, chan, param1);
+            break;
         case NOTE_ON:
+            fluid_event_noteon(&parser->event, chan, param1, param2);
+            break;
         case KEY_PRESSURE:
+            fluid_event_key_pressure(&parser->event, chan, param1, param2);
+            break;
         case CONTROL_CHANGE:
+            fluid_event_control_change(&parser->event, chan, param1, param2);
+            break;
         case PROGRAM_CHANGE:
+            fluid_event_program_change(&parser->event, chan, param1);
+            break;
         case CHANNEL_PRESSURE:
-            parser->event.param1 = parser->data[0]; /* For example key number */
-            parser->event.param2 = parser->data[1]; /* For example velocity */
+            fluid_event_channel_pressure(&parser->event, chan, param1);
             break;
         case PITCH_BEND:
             /* Pitch-bend is transmitted with 14-bit precision. */
-            parser->event.param1 = (parser->data[1] << 7) | parser->data[0];
+            fluid_event_pitch_bend(&parser->event, chan, ((param2 << 7) | param1));
             break;
         default: /* Unlikely */
             return NULL;

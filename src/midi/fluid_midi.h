@@ -364,7 +364,7 @@ struct _fluid_midi_parser_t {
   unsigned int nr_bytes;          /* How many bytes have been read for the current event? */
   unsigned int nr_bytes_total;    /* How many bytes does the current event type include? */
   unsigned char data[FLUID_MIDI_PARSER_MAX_DATA_SIZE]; /* The parameters or SYSEX data */
-  fluid_midi_event_t event;        /* The event, that is returned to the MIDI driver. */
+  fluid_event_t event;        /* The event, that is returned to the MIDI driver. */
 };
 
 int fluid_isasciistring(char* s);
