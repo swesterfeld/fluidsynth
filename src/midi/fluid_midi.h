@@ -24,6 +24,7 @@
 #include "fluidsynth_priv.h"
 #include "fluid_sys.h"
 #include "fluid_list.h"
+#include "fluid_event_priv.h"
 
 
 /***************************************************************

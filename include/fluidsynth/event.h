@@ -67,6 +67,7 @@ enum fluid_seq_event_type {
 /* Event alloc/free */
 FLUIDSYNTH_API fluid_event_t* new_fluid_event(void);
 FLUIDSYNTH_API void delete_fluid_event(fluid_event_t* evt);
+FLUIDSYNTH_API void fluid_event_clone(fluid_event_t* dst, const fluid_event_t* src);
 
 /* Initializing events */
 FLUIDSYNTH_API void fluid_event_set_source(fluid_event_t* evt, fluid_seq_id_t src);

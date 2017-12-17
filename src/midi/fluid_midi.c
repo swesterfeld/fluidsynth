@@ -1940,7 +1940,7 @@ delete_fluid_midi_parser(fluid_midi_parser_t *parser)
  *     fluid_event_t* event = fluid_midi_parser_parse(parser, my_byte_stream[i]);
  *     if (event != NULL)
  *     {
- *         fluid_event_set_dest(&evt, some_seq_id);
+ *         fluid_event_set_dest(event, some_seq_id);
  *         ret = fluid_sequencer_send_now(seq, event);
  *     }
  * }
@@ -1955,7 +1955,7 @@ fluid_midi_parser_parse(fluid_midi_parser_t *parser, unsigned char c)
      * of another message. */
     if (c >= 0xF8) {
         if (c == MIDI_SYSTEM_RESET) {
-            fluid_event_system_reset(parser->event);
+            fluid_event_system_reset(&parser->event);
             parser->status = 0; /* clear the status */
             return &parser->event;
         }

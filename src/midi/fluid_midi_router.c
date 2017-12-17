@@ -718,9 +718,9 @@ send_event:
      * Create a new event and make the appropriate call */
 
     fluid_event_clone(&new_event, event);
-    new_event->channel = chan;
-    memcpy(&new_event.param1, &par1);
-    memcpy(&new_event.param2, &par2);
+    new_event.channel = chan;
+    memcpy(&new_event.param1, &par1, sizeof(par1));
+    memcpy(&new_event.param2, &par2, sizeof(par2));
 
     /* FIXME - What should be done on failure?  For now continue to process events, but return failure to caller. */
     if (router->event_handler (router->event_handler_data, &new_event) != FLUID_OK)

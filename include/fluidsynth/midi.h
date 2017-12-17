@@ -103,7 +103,7 @@ FLUIDSYNTH_API void fluid_midi_router_rule_set_param1 (fluid_midi_router_rule_t 
                                                        int min, int max, float mul, int add);
 FLUIDSYNTH_API void fluid_midi_router_rule_set_param2 (fluid_midi_router_rule_t *rule,
                                                        int min, int max, float mul, int add);
-FLUIDSYNTH_API int fluid_midi_router_handle_midi_event(void* data, fluid_midi_event_t* event);
+FLUIDSYNTH_API int fluid_midi_router_handle_midi_event(void* data, fluid_event_t* event);
 FLUIDSYNTH_API int fluid_midi_dump_prerouter(void* data, fluid_midi_event_t* event); 
 FLUIDSYNTH_API int fluid_midi_dump_postrouter(void* data, fluid_midi_event_t* event); 
 
@@ -150,7 +150,7 @@ FLUIDSYNTH_API int fluid_player_seek(fluid_player_t *player, int ticks);
 
 FLUIDSYNTH_API fluid_midi_parser_t* new_fluid_midi_parser(void);
 FLUIDSYNTH_API void delete_fluid_midi_parser(fluid_midi_parser_t* parser);
-FLUIDSYNTH_API fluid_midi_event_t* fluid_midi_parser_parse(fluid_midi_parser_t* parser, unsigned char c);
+FLUIDSYNTH_API fluid_event_t* fluid_midi_parser_parse(fluid_midi_parser_t* parser, unsigned char c);
     
 #ifdef __cplusplus
 }

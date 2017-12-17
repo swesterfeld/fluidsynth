@@ -69,6 +69,16 @@ new_fluid_event()
 }
 
 /**
+ * Clone an event.
+ * @param dst user provided buffer to store the copy to
+ * @param src the source event to retrieve the information from
+ */
+void fluid_event_clone(fluid_event_t* dst, const fluid_event_t* src)
+{
+    memcpy(dst, src, sizeof(*dst));
+}
+
+/**
  * Delete a sequencer event structure.
  * @param evt Sequencer event structure created by new_fluid_event().
  */
@@ -138,8 +148,8 @@ fluid_event_noteon(fluid_event_t* evt, int channel, short key, short vel)
 {
 	evt->type = FLUID_SEQ_NOTEON;
 	evt->channel = channel;
-	evt->key = key;
-	evt->vel = vel;
+	evt->param1.key = key;
+	evt->param2.vel = vel;
 }
 
 /**
@@ -153,7 +163,7 @@ fluid_event_noteoff(fluid_event_t* evt, int channel, short key)
 {
 	evt->type = FLUID_SEQ_NOTEOFF;
 	evt->channel = channel;
-	evt->key = key;
+	evt->param1.key = key;
 }
 
 /**
@@ -169,8 +179,8 @@ fluid_event_note(fluid_event_t* evt, int channel, short key, short vel, unsigned
 {
 	evt->type = FLUID_SEQ_NOTE;
 	evt->channel = channel;
-	evt->key = key;
-	evt->vel = vel;
+	evt->param1.key = key;
+	evt->param2.vel = vel;
 	evt->duration = duration;
 }
 
@@ -209,7 +219,7 @@ fluid_event_bank_select(fluid_event_t* evt, int channel, short bank_num)
 {
 	evt->type = FLUID_SEQ_BANKSELECT;
 	evt->channel = channel;
-	evt->control = bank_num;
+	evt->param1.control = bank_num;
 }
 
 /**
@@ -223,7 +233,7 @@ fluid_event_program_change(fluid_event_t* evt, int channel, short val)
 {
 	evt->type = FLUID_SEQ_PROGRAMCHANGE;
 	evt->channel = channel;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -241,8 +251,8 @@ fluid_event_program_select(fluid_event_t* evt, int channel,
 	evt->type = FLUID_SEQ_PROGRAMSELECT;
 	evt->channel = channel;
 	evt->duration = sfont_id;
-	evt->value = preset_num;
-	evt->control = bank_num;
+	evt->param2.value = preset_num;
+	evt->param1.control = bank_num;
 }
 
 /**
@@ -270,7 +280,7 @@ fluid_event_pitch_bend(fluid_event_t* evt, int channel, int pitch)
 	evt->channel = channel;
 	if (pitch < 0) pitch = 0;
 	if (pitch > 16383) pitch = 16383;
-	evt->pitch = pitch;
+	evt->param1.pitch = pitch;
 }
 
 /**
@@ -284,7 +294,7 @@ fluid_event_pitch_wheelsens(fluid_event_t* evt, int channel, short value)
 {
 	evt->type = FLUID_SEQ_PITCHWHEELSENS;
 	evt->channel = channel;
-	evt->value = value;
+	evt->param2.value = value;
 }
 
 /**
@@ -300,7 +310,7 @@ fluid_event_modulation(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -316,7 +326,7 @@ fluid_event_sustain(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -331,8 +341,8 @@ fluid_event_control_change(fluid_event_t* evt, int channel, short control, short
 {
 	evt->type = FLUID_SEQ_CONTROLCHANGE;
 	evt->channel = channel;
-	evt->control = control;
-	evt->value = val;
+	evt->param1.control = control;
+	evt->param2.value = val;
 }
 
 /**
@@ -348,7 +358,7 @@ fluid_event_pan(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -364,7 +374,7 @@ fluid_event_volume(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -380,7 +390,7 @@ fluid_event_reverb_send(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -396,7 +406,7 @@ fluid_event_chorus_send(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 
@@ -425,7 +435,7 @@ fluid_event_channel_pressure(fluid_event_t* evt, int channel, short val)
 	evt->channel = channel;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->value = val;
+	evt->param2.value = val;
 }
 
 /**
@@ -445,8 +455,8 @@ fluid_event_key_pressure(fluid_event_t* evt, int channel, short key, short val)
 	if (key > 127) key = 127;
 	if (val < 0) val = 0;
 	if (val > 127) val = 127;
-	evt->key = key;
-	evt->value = val;
+	evt->param1.key = key;
+	evt->param2.value = val;
 }
 
 /**
@@ -524,7 +534,7 @@ int fluid_event_get_channel(fluid_event_t* evt)
  */
 short fluid_event_get_key(fluid_event_t* evt)
 {
-	return evt->key;
+	return evt->param1.key;
 }
 
 /**
@@ -535,7 +545,7 @@ short fluid_event_get_key(fluid_event_t* evt)
 short fluid_event_get_velocity(fluid_event_t* evt)
 
 {
-	return evt->vel;
+	return evt->param2.vel;
 }
 
 /**
@@ -545,7 +555,7 @@ short fluid_event_get_velocity(fluid_event_t* evt)
  */
 short fluid_event_get_control(fluid_event_t* evt)
 {
-	return evt->control;
+	return evt->param1.control;
 }
 
 /**
@@ -561,7 +571,7 @@ short fluid_event_get_control(fluid_event_t* evt)
  */
 short fluid_event_get_value(fluid_event_t* evt)
 {
-	return evt->value;
+	return evt->param2.value;
 }
 
 /**
@@ -598,7 +608,7 @@ unsigned int fluid_event_get_duration(fluid_event_t* evt)
  */
 short fluid_event_get_bank(fluid_event_t* evt)
 {
-	return evt->control;
+	return evt->param1.control;
 }
 
 /**
@@ -610,7 +620,7 @@ short fluid_event_get_bank(fluid_event_t* evt)
  */
 int fluid_event_get_pitch(fluid_event_t* evt)
 {
-	return evt->pitch;
+	return evt->param1.pitch;
 }
 
 /**
@@ -624,7 +634,7 @@ int fluid_event_get_pitch(fluid_event_t* evt)
 short
 fluid_event_get_program(fluid_event_t* evt)
 {
-	return evt->value;
+	return evt->param2.value;
 }
 
 /**
