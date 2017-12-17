@@ -594,7 +594,7 @@ fluid_midi_router_handle_midi_event (void* data, fluid_event_t* event)
 	continue;
     }
 
-    par1 = event->param1.key;
+    memcpy(&par1, &event->param1, sizeof(par1));
     /* Par 1 window */
     if (rule->par1_min > rule->par1_max)
     { /* Inverted rule: Exclude everything between max and min (but not min/max) */
@@ -607,7 +607,7 @@ fluid_midi_router_handle_midi_event (void* data, fluid_event_t* event)
 	continue;
     }
 
-    par2 = event->param2.value;
+    memcpy(&par2, &event->param2, sizeof(par2));
     /* Par 2 window (only applies to event types, which have 2 pars)
      * For noteoff events, velocity switching doesn't make any sense.
      * Velocity scaling might be useful, though.
