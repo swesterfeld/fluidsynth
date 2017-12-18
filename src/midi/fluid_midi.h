@@ -235,9 +235,9 @@ struct _fluid_midi_event_t {
 struct _fluid_track_t {
   char* name;
   int num;
-  fluid_midi_event_t *first;
-  fluid_midi_event_t *cur;
-  fluid_midi_event_t *last;
+  int cur;
+  int num_events;
+  fluid_event_t *events;
   unsigned int ticks;
 };
 
@@ -246,13 +246,12 @@ typedef struct _fluid_track_t fluid_track_t;
 fluid_track_t* new_fluid_track(int num);
 void delete_fluid_track(fluid_track_t* track);
 int fluid_track_set_name(fluid_track_t* track, char* name);
-int fluid_track_add_event(fluid_track_t* track, fluid_midi_event_t* evt);
-fluid_midi_event_t* fluid_track_next_event(fluid_track_t* track);
+int fluid_track_add_event(fluid_track_t* track, fluid_event_t* evt);
+fluid_event_t* fluid_track_next_event(fluid_track_t* track);
 int fluid_track_get_duration(fluid_track_t* track);
 int fluid_track_reset(fluid_track_t* track);
 
 int fluid_track_send_events(fluid_track_t* track,
-			   fluid_synth_t* synth,
 			   fluid_player_t* player,
 			   unsigned int ticks);
 
