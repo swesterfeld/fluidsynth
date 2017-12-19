@@ -1163,21 +1163,18 @@ fluid_track_get_duration(fluid_track_t *track)
 int
 fluid_track_add_event(fluid_track_t *track, fluid_event_t *evt)
 {
-    int new_size = track->cur + 1;
+    int new_size = track->num_events + 1;
     
-    if(new_size >= track->num_events)
+    fluid_event_t* new_events = FLUID_REALLOC(track->events, new_size*sizeof(*evt));
+    if(new_events == NULL)
     {
-        fluid_event_t* new_events = FLUID_REALLOC(track->events, new_size*sizeof(*evt));
-        if(new_events == NULL)
-        {
-            return FLUID_FAILED;
-        }
-        
-        track->events = new_events;
-        track->num_events = new_size;
+        return FLUID_FAILED;
     }
-        
-    track->events[track->cur++] = *evt;
+    
+    new_events[track->num_events] = *evt;
+    
+    track->events = new_events;
+    track->num_events = new_size;
     
     return FLUID_OK;
 }
