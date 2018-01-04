@@ -51,6 +51,8 @@ typedef struct {
   HANDLE hThread;
   DWORD  dwThread;
 
+  fluid_midi_parser_t* parser;
+  
   /* Sysex data buffer */
   unsigned char sysExBuf[MIDI_SYSEX_BUF_COUNT * MIDI_SYSEX_MAX_SIZE];
 
@@ -149,6 +151,12 @@ new_fluid_winmidi_driver(fluid_settings_t* settings,
   dev->hmidiin = NULL;
   dev->driver.handler = handler;
   dev->driver.data = data;
+  
+  dev->parser = new_fluid_midi_parser();
+  if (dev->parser == NULL) {
+    FLUID_LOG(FLUID_ERR, "Out of memory");
+    goto error_recovery;
+  }
 
   /* get the device name. if none is specified, use the default device. */
   if(fluid_settings_dupstr(settings, "midi.winmidi.device", &devname) != FLUID_OK || !devname) {
@@ -279,6 +287,7 @@ delete_fluid_winmidi_driver(fluid_midi_driver_t* p)
     midiInClose(dev->hmidiin);
   }
 
+  delete_fluid_midi_parser(dev->parser);
   FLUID_FREE(dev);
 }
 
@@ -287,7 +296,7 @@ fluid_winmidi_callback(HMIDIIN hmi, UINT wMsg, DWORD_PTR dwInstance,
                        DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
   fluid_winmidi_driver_t* dev = (fluid_winmidi_driver_t *) dwInstance;
-  fluid_midi_event_t event;
+  fluid_event_t* event;
   LPMIDIHDR pMidiHdr;
   unsigned char *data;
   unsigned int msg_param = (unsigned int) dwParam1;
@@ -300,18 +309,28 @@ fluid_winmidi_callback(HMIDIIN hmi, UINT wMsg, DWORD_PTR dwInstance,
     break;
 
   case MIM_DATA:
-    event.type = msg_type(msg_param);
-    event.channel = msg_chan(msg_param);
-
-    if (event.type != PITCH_BEND) {
-      event.param1 = msg_p1(msg_param);
-      event.param2 = msg_p2(msg_param);
-    } else {  /* Pitch bend is a 14 bit value */
-      event.param1 = (msg_p2 (msg_param) << 7) | msg_p1 (msg_param);
-      event.param2 = 0;
+    event = fluid_midi_parser_parse(dev->parser, (msg_param & 0xFF));
+    if(event != NULL)
+    {
+        FLUID_LOG(FLUID_ERR, "Successfully parsed midi event, although did not expect one");
+        break;
     }
-
-    (*dev->driver.handler)(dev->driver.data, &event);
+    
+    event = fluid_midi_parser_parse(dev->parser, msg_p1(msg_param));
+    if (event != NULL)
+    {
+        (*dev->driver.handler)(dev->driver.data, &event);
+        break;
+    }
+    
+    event = fluid_midi_parser_parse(dev->parser, msg_p2(msg_param));
+    if (event != NULL)
+    {
+        (*dev->driver.handler)(dev->driver.data, &event);
+        break;
+    }
+    
+    FLUID_LOG(FLUID_ERR, "Unable to create a midi event");
     break;
 
   case MIM_LONGDATA:    /* SYSEX data */
@@ -325,7 +344,7 @@ fluid_winmidi_callback(HMIDIIN hmi, UINT wMsg, DWORD_PTR dwInstance,
     if (pMidiHdr->dwBytesRecorded > 2 && data[0] == 0xF0
         && data[pMidiHdr->dwBytesRecorded - 1] == 0xF7)
     {
-      fluid_midi_event_set_sysex (&event, pMidiHdr->lpData + 1,
+      fluid_event_set_sysex (&event, pMidiHdr->lpData + 1,
                                   pMidiHdr->dwBytesRecorded - 2, FALSE);
       (*dev->driver.handler)(dev->driver.data, &event);
     }
