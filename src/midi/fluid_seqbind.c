@@ -130,15 +130,10 @@ fluid_seq_fluidsynth_callback(unsigned int time, fluid_event_t* evt, fluid_seque
 	fluid_seqbind_t* seqbind = (fluid_seqbind_t *) data;
 	synth = seqbind->synth;
 
+    if(fluid_synth_handle_event(synth, evt) == FLUID_OK)
+        return;
+    
   switch (fluid_event_get_type(evt)) {
-
-  case FLUID_SEQ_NOTEON:
-  	fluid_synth_noteon(synth, fluid_event_get_channel(evt), fluid_event_get_key(evt), fluid_event_get_velocity(evt));
-  	break;
-
-  case FLUID_SEQ_NOTEOFF:
-  	fluid_synth_noteoff(synth, fluid_event_get_channel(evt), fluid_event_get_key(evt));
-  	break;
 
   case FLUID_SEQ_NOTE:
 	  {
@@ -150,93 +145,10 @@ fluid_seq_fluidsynth_callback(unsigned int time, fluid_event_t* evt, fluid_seque
 	  }
   	break;
 
-	case FLUID_SEQ_ALLSOUNDSOFF:
-        fluid_synth_all_sounds_off(synth, fluid_event_get_channel(evt));
-  	break;
-
-  case FLUID_SEQ_ALLNOTESOFF:
-  	fluid_synth_all_notes_off(synth, fluid_event_get_channel(evt));
-  	break;
-
-  case FLUID_SEQ_BANKSELECT:
-  	fluid_synth_bank_select(synth, fluid_event_get_channel(evt), fluid_event_get_bank(evt));
-  	break;
-
-  case FLUID_SEQ_PROGRAMCHANGE:
-  	fluid_synth_program_change(synth, fluid_event_get_channel(evt), fluid_event_get_program(evt));
-  	break;
-
-  case FLUID_SEQ_PROGRAMSELECT:
-  	fluid_synth_program_select(synth,
-                               fluid_event_get_channel(evt),
-                               fluid_event_get_sfont_id(evt),
-                               fluid_event_get_bank(evt),
-                               fluid_event_get_program(evt));
-  	break;
-
-  case FLUID_SEQ_ANYCONTROLCHANGE:
-  	/* nothing = only used by remove_events */
-  	break;
-
-  case FLUID_SEQ_PITCHBEND:
-  	fluid_synth_pitch_bend(synth, fluid_event_get_channel(evt), fluid_event_get_pitch(evt));
-  	break;
-
-  case FLUID_SEQ_PITCHWHEELSENS:
-  	fluid_synth_pitch_wheel_sens(synth, fluid_event_get_channel(evt), fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_CONTROLCHANGE:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), fluid_event_get_control(evt), fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_MODULATION:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), MODULATION_MSB, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_SUSTAIN:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), SUSTAIN_SWITCH, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_PAN:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), PAN_MSB, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_VOLUME:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), VOLUME_MSB, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_REVERBSEND:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), EFFECTS_DEPTH1, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_CHORUSSEND:
-    fluid_synth_cc(synth, fluid_event_get_channel(evt), EFFECTS_DEPTH3, fluid_event_get_value(evt));
-  	break;
-
-  case FLUID_SEQ_CHANNELPRESSURE:
-    fluid_synth_channel_pressure(synth, fluid_event_get_channel(evt), fluid_event_get_value(evt));
-	break;
-
-  case FLUID_SEQ_KEYPRESSURE:
-		fluid_synth_key_pressure(synth,
-					 fluid_event_get_channel(evt),
-					 fluid_event_get_key(evt),
-					 fluid_event_get_value(evt));
-	break;
-
-  case FLUID_SEQ_SYSTEMRESET: 
-    fluid_synth_system_reset(synth);
-	break;
-
   case FLUID_SEQ_UNREGISTERING: /* free ourselves */
     seqbind->client_id = -1; /* avoid recursive call to fluid_sequencer_unregister_client */
     delete_fluid_seqbind(seqbind);
 	break;
-
-  case FLUID_SEQ_TIMER:
-	  /* nothing in fluidsynth */
-  	break;
 
 	default:
   	break;

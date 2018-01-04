@@ -4926,57 +4926,112 @@ fluid_synth_get_gen(fluid_synth_t* synth, int chan, int param)
 }
 
 /**
- * Handle MIDI event from MIDI router, used as a callback function.
+ * Handle an event from MIDI router, used as a callback function.
  * @param data FluidSynth instance
- * @param event MIDI event to handle
+ * @param event Event to handle
  * @return FLUID_OK on success, FLUID_FAILED otherwise
  */
 int
-fluid_synth_handle_midi_event(void* data, fluid_midi_event_t* event)
+fluid_synth_handle_event(void* data, fluid_event_t* event)
 {
   fluid_synth_t* synth = (fluid_synth_t*) data;
-  int type = fluid_midi_event_get_type(event);
-  int chan = fluid_midi_event_get_channel(event);
 
-  switch(type) {
-      case NOTE_ON:
-	return fluid_synth_noteon(synth, chan,
-                                  fluid_midi_event_get_key(event),
-                                  fluid_midi_event_get_velocity(event));
+  switch (fluid_event_get_type(evt)) {
+  case FLUID_SEQ_NOTEON:
+  	fluid_synth_noteon(synth, fluid_event_get_channel(evt), fluid_event_get_key(evt), fluid_event_get_velocity(evt));
+  	break;
 
-      case NOTE_OFF:
-	return fluid_synth_noteoff(synth, chan, fluid_midi_event_get_key(event));
+  case FLUID_SEQ_NOTEOFF:
+  	fluid_synth_noteoff(synth, fluid_event_get_channel(evt), fluid_event_get_key(evt));
+  	break;
 
-      case CONTROL_CHANGE:
-	return fluid_synth_cc(synth, chan,
-                              fluid_midi_event_get_control(event),
-                              fluid_midi_event_get_value(event));
+	case FLUID_SEQ_ALLSOUNDSOFF:
+        fluid_synth_all_sounds_off(synth, fluid_event_get_channel(evt));
+  	break;
 
-      case PROGRAM_CHANGE:
-	return fluid_synth_program_change(synth, chan, fluid_midi_event_get_program(event));
+  case FLUID_SEQ_ALLNOTESOFF:
+  	fluid_synth_all_notes_off(synth, fluid_event_get_channel(evt));
+  	break;
 
-      case CHANNEL_PRESSURE:
-	return fluid_synth_channel_pressure(synth, chan, fluid_midi_event_get_program(event));
+  case FLUID_SEQ_BANKSELECT:
+  	fluid_synth_bank_select(synth, fluid_event_get_channel(evt), fluid_event_get_bank(evt));
+  	break;
 
-      case KEY_PRESSURE:
-	return fluid_synth_key_pressure(synth, chan,
-					fluid_midi_event_get_key(event),
-					fluid_midi_event_get_value(event));
+  case FLUID_SEQ_PROGRAMCHANGE:
+  	fluid_synth_program_change(synth, fluid_event_get_channel(evt), fluid_event_get_program(evt));
+  	break;
 
-      case PITCH_BEND:
-	return fluid_synth_pitch_bend(synth, chan, fluid_midi_event_get_pitch(event));
+  case FLUID_SEQ_PROGRAMSELECT:
+  	fluid_synth_program_select(synth,
+                               fluid_event_get_channel(evt),
+                               fluid_event_get_sfont_id(evt),
+                               fluid_event_get_bank(evt),
+                               fluid_event_get_program(evt));
+  	break;
 
-      case MIDI_SYSTEM_RESET:
-	return fluid_synth_system_reset(synth);
-      case MIDI_SYSEX:
-        return fluid_synth_sysex (synth, event->paramptr, event->param1, NULL, NULL, NULL, FALSE);
-                
-     case MIDI_TEXT:
-     case MIDI_LYRIC:
-     case MIDI_SET_TEMPO:
-       return FLUID_OK;
-  }
-  return FLUID_FAILED;
+  case FLUID_SEQ_ANYCONTROLCHANGE:
+  	/* nothing = only used by remove_events */
+  	break;
+
+  case FLUID_SEQ_PITCHBEND:
+  	fluid_synth_pitch_bend(synth, fluid_event_get_channel(evt), fluid_event_get_pitch(evt));
+  	break;
+
+  case FLUID_SEQ_PITCHWHEELSENS:
+  	fluid_synth_pitch_wheel_sens(synth, fluid_event_get_channel(evt), fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_CONTROLCHANGE:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), fluid_event_get_control(evt), fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_MODULATION:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), MODULATION_MSB, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_SUSTAIN:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), SUSTAIN_SWITCH, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_PAN:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), PAN_MSB, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_VOLUME:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), VOLUME_MSB, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_REVERBSEND:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), EFFECTS_DEPTH1, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_CHORUSSEND:
+    fluid_synth_cc(synth, fluid_event_get_channel(evt), EFFECTS_DEPTH3, fluid_event_get_value(evt));
+  	break;
+
+  case FLUID_SEQ_CHANNELPRESSURE:
+    fluid_synth_channel_pressure(synth, fluid_event_get_channel(evt), fluid_event_get_value(evt));
+	break;
+
+  case FLUID_SEQ_KEYPRESSURE:
+		fluid_synth_key_pressure(synth,
+					 fluid_event_get_channel(evt),
+					 fluid_event_get_key(evt),
+					 fluid_event_get_value(evt));
+	break;
+
+  case FLUID_SEQ_SYSTEMRESET: 
+    fluid_synth_system_reset(synth);
+	break;
+    
+  case FLUID_SEQ_TIMER:
+	  /* nothing in fluidsynth */
+  	break;
+    
+  default:
+      return FLUID_FAILED;
+}
+return FLUID_OK;
 }
 
 /**
