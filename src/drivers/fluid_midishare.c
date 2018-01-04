@@ -58,7 +58,6 @@ typedef struct {
   	UPPRcvAlarmPtr upp_alarm_ptr;
   	UPPDriverPtr   upp_wakeup_ptr;
   	UPPDriverPtr   upp_sleep_ptr;
-  	UPPTaskPtr     upp_task_ptr;
   #endif
   SlotRefNum	slotRef;
   unsigned char sysexbuf[FLUID_MIDI_PARSER_MAX_DATA_SIZE];
@@ -173,7 +172,6 @@ void delete_fluid_midishare_midi_driver(fluid_midi_driver_t* p)
   	DisposeRoutineDescriptor(dev->upp_alarm_ptr);
   	DisposeRoutineDescriptor(dev->upp_wakeup_ptr);
   	DisposeRoutineDescriptor(dev->upp_sleep_ptr);
-  	DisposeRoutineDescriptor(dev->upp_task_ptr);
   #endif
 
   dev->status = FLUID_MIDI_DONE;
@@ -193,97 +191,48 @@ int fluid_midishare_midi_driver_status(fluid_midi_driver_t* p)
 
 
 /*
- * fluid_midishare_keyoff_task
- */
-static void fluid_midishare_keyoff_task (long date, short ref, long a1, long a2, long a3)
-{
-	fluid_midishare_midi_driver_t* dev = (fluid_midishare_midi_driver_t*)MidiGetInfo(ref);
-	fluid_midi_event_t new_event;
-  	MidiEvPtr e =(MidiEvPtr)a1;
-
-	fluid_midi_event_set_type(&new_event, NOTE_OFF);
-	fluid_midi_event_set_channel(&new_event, Chan(e));
-	fluid_midi_event_set_pitch(&new_event, Pitch(e));
-	fluid_midi_event_set_velocity(&new_event, Vel(e)); /* release vel */
-
-	/* and send it on its way to the router */
-	(*dev->driver.handler)(dev->driver.data, &new_event);
-
-	MidiFreeEv(e);
-}
-
-
-/*
  * fluid_midishare_midi_driver_receive
  */
 static void fluid_midishare_midi_driver_receive(short ref)
 {
   fluid_midishare_midi_driver_t* dev = (fluid_midishare_midi_driver_t*)MidiGetInfo(ref);
-  fluid_midi_event_t new_event;
+  fluid_event_t new_event;
   MidiEvPtr e;
   int count, i;
 
+  fluid_event_clear(&new_event);
   while ((e = MidiGetEv (ref)))
   {
     switch (EvType (e))
     {
       case typeNote:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, NOTE_ON);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_pitch(&new_event, Pitch(e));
-        fluid_midi_event_set_velocity(&new_event, Vel(e));
-
-        /* and send it on its way to the router */
-        (*dev->driver.handler)(dev->driver.data, &new_event);
-
-#if defined(MACINTOSH) && defined(MACOS9)
-        MidiTask(dev->upp_task_ptr, MidiGetTime()+Dur(e), ref, (long)e, 0, 0);
-#else
-        MidiTask(fluid_midishare_keyoff_task, MidiGetTime()+Dur(e), ref, (long)e, 0, 0);
-#endif
-
-        /* e gets freed in fluid_midishare_keyoff_task */
-        continue;
-
+        /* Copy the data to fluid_event_t */
+        fluid_event_note(&new_event, Chan(e), Pitch(e), Vel(e), Dur(e));
+        break;
+        
       case typeKeyOn:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, NOTE_ON);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_pitch(&new_event, Pitch(e));
-        fluid_midi_event_set_velocity(&new_event, Vel(e));
+        /* Copy the data to fluid_event_t */
+        fluid_event_noteon(&new_event, Chan(e), Pitch(e), Vel(e));
         break;
 
       case typeKeyOff:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, NOTE_OFF);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_pitch(&new_event, Pitch(e));
-        fluid_midi_event_set_velocity(&new_event, Vel(e)); /* release vel */
+        /* Copy the data to fluid_event_t */
+        fluid_event_noteoff(&new_event, Chan(e), Pitch(e), Vel(e));
         break;
 
       case typeCtrlChange:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, CONTROL_CHANGE);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_control(&new_event, MidiGetField(e,0));
-        fluid_midi_event_set_value(&new_event, MidiGetField(e,1));
+        /* Copy the data to fluid_event_t */
+        fluid_event_control_change(&new_event, Chan(e), MidiGetField(e,0), MidiGetField(e,1));
         break;
 
       case typeProgChange:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, PROGRAM_CHANGE);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_program(&new_event, MidiGetField(e,0));
+        /* Copy the data to fluid_event_t */
+        fluid_event_program_change(&new_event, Chan(e), MidiGetField(e,0));
         break;
 
       case typePitchWheel:
-        /* Copy the data to fluid_midi_event_t */
-        fluid_midi_event_set_type(&new_event, PITCH_BEND);
-        fluid_midi_event_set_channel(&new_event, Chan(e));
-        fluid_midi_event_set_value(&new_event, ((MidiGetField(e,0)
-                                                 + (MidiGetField(e,1) << 7))
-                                                - 8192));
+        /* Copy the data to fluid_event_t */
+        fluid_event_pitch_bend(&new_event, Chan(e), (MidiGetField(e,0) + (MidiGetField(e,1) << 7)));
         break;
 
       case typeSysEx:
@@ -300,7 +249,7 @@ static void fluid_midishare_midi_driver_receive(short ref)
         for (i = 0; i < count; i++)
           dev->sysexbuf[i] = MidiGetField (e, i);
 
-        fluid_midi_event_set_sysex (&new_event, dev->sysexbuf, count, FALSE);
+        fluid_event_set_sysex (&new_event, dev->sysexbuf, count, FALSE);
         break;
 
       default:
@@ -356,7 +305,6 @@ static int fluid_midishare_open_driver (fluid_midishare_midi_driver_t* dev)
 		}
 		dev->slotRef = MidiAddSlot (dev->refnum, MSHSlotName, MidiOutputSlot);
 		dev->upp_alarm_ptr = NewRcvAlarmPtr(fluid_midishare_midi_driver_receive);
-		dev->upp_task_ptr = NewTaskPtr(fluid_midishare_keyoff_task);
 		MidiSetRcvAlarm(dev->refnum, dev->upp_alarm_ptr);
 	#else
 		dev->refnum = MidiRegisterDriver(&infos, &op);
@@ -393,7 +341,6 @@ static int fluid_midishare_open_appl (fluid_midishare_midi_driver_t* dev)
 			return 0;
 		}
 		dev->upp_alarm_ptr = NewRcvAlarmPtr(fluid_midishare_midi_driver_receive);
-		dev->upp_task_ptr = NewTaskPtr(fluid_midishare_keyoff_task);
 		MidiSetRcvAlarm(dev->refnum, dev->upp_alarm_ptr);
 	#else
 		dev->refnum = MidiOpen(MSHDriverName);
