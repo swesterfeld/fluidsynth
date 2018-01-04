@@ -618,7 +618,7 @@ fluid_thread_return_t
 fluid_oss_midi_run(void* d)
 {
   fluid_oss_midi_driver_t* dev = (fluid_oss_midi_driver_t*) d;
-  fluid_midi_event_t* evt;
+  fluid_event_t* evt;
   struct pollfd fds;
   int n, i;
 

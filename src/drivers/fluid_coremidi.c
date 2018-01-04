@@ -180,7 +180,7 @@ void
 fluid_coremidi_callback(const MIDIPacketList *list, void *p, void *src)
 {
   unsigned int i, j;
-  fluid_midi_event_t* event;
+  fluid_event_t* event;
   fluid_coremidi_driver_t* dev = (fluid_coremidi_driver_t *)p;
   const MIDIPacket *packet = &list->packet[0];
   for ( i = 0; i < list->numPackets; ++i ) {

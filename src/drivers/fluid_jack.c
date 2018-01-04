@@ -516,7 +516,7 @@ fluid_jack_driver_process (jack_nframes_t nframes, void *arg)
   int i, k;
 
   jack_midi_event_t midi_event;
-  fluid_midi_event_t *evt;
+  fluid_event_t *evt;
   void *midi_buffer;
   jack_nframes_t event_count;
   jack_nframes_t event_index;

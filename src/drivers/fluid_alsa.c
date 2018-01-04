@@ -667,7 +667,7 @@ delete_fluid_alsa_rawmidi_driver(fluid_midi_driver_t* p)
 fluid_thread_return_t
 fluid_alsa_midi_run(void* d)
 {
-  fluid_midi_event_t* evt;
+  fluid_event_t* evt;
   fluid_alsa_rawmidi_driver_t* dev = (fluid_alsa_rawmidi_driver_t*) d;
   int n, i;
 
