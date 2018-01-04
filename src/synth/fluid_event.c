@@ -650,6 +650,61 @@ fluid_event_get_sfont_id(fluid_event_t* evt)
 	return evt->duration;
 }
 
+void fluid_event_to_str(fluid_event_t* evt, char* buf, int len)
+{
+    switch (fluid_event_get_type(evt)) {
+        case FLUID_SEQ_NOTEON:
+          FLUID_SNPRINTF(buf, len, 
+                         "noteon %i %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_key(evt),
+                         fluid_event_get_velocity(evt));
+        break;
+        case FLUID_SEQ_NOTEOFF:
+          FLUID_SNPRINTF(buf, len, 
+                         "noteoff %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_key(evt));
+        break;
+        case FLUID_SEQ_CONTROLCHANGE:
+          FLUID_SNPRINTF(buf, len, 
+                         "cc %i %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_control(evt),
+                         fluid_event_get_val(evt),
+                        );
+        break;
+        case FLUID_SEQ_PROGRAMCHANGE:
+          FLUID_SNPRINTF(buf, len, 
+                         "prog %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_program(evt));
+        break;
+        case FLUID_SEQ_PITCHBEND:
+          FLUID_SNPRINTF(buf, len, 
+                         "pitch %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_pitch(evt));
+        break;
+        case FLUID_SEQ_CHANNELPRESSURE:
+          FLUID_SNPRINTF(buf, len, 
+                         "cpress %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_value(evt));
+        break;
+        case FLUID_SEQ_KEYPRESSURE:
+          FLUID_SNPRINTF(buf, len, 
+                         "kpress %i %i",
+                         fluid_event_get_channel(evt),
+                         fluid_event_get_value(evt));
+        break;
+        
+        default:
+          buf[0] = '\0';
+        break;
+  }
+}
+
 
 
 /********************/
