@@ -27,15 +27,8 @@ extern "C" {
 
 /**
  * @file midi.h
- * @brief Functions for MIDI events, drivers and MIDI file playback.
+ * @brief Functions for MIDI drivers and MIDI file playback.
  */
-
-FLUIDSYNTH_API int fluid_midi_event_set_sysex(fluid_midi_event_t* evt, void *data,
-                                              int size, int dynamic);
-FLUIDSYNTH_API int fluid_midi_event_set_text(fluid_midi_event_t *evt,
-                                             void *data, int size, int dynamic);
-FLUIDSYNTH_API int fluid_midi_event_set_lyrics(fluid_midi_event_t *evt,
-                                             void *data, int size, int dynamic);
 
 /**
  * MIDI router rule type.

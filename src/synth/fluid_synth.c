@@ -4932,7 +4932,7 @@ fluid_synth_get_gen(fluid_synth_t* synth, int chan, int param)
  * @return FLUID_OK on success, FLUID_FAILED otherwise
  */
 int
-fluid_synth_handle_event(void* data, fluid_event_t* event)
+fluid_synth_handle_event(void* data, fluid_event_t* evt)
 {
   fluid_synth_t* synth = (fluid_synth_t*) data;
 
@@ -5024,6 +5024,10 @@ fluid_synth_handle_event(void* data, fluid_event_t* event)
     fluid_synth_system_reset(synth);
 	break;
     
+  case FLUID_SEQ_SYSEX:
+      fluid_synth_sysex(synth, fluid_event_get_data(evt), fluid_event_get_value(evt), NULL, NULL, NULL, FALSE);
+    
+  case FLUID_SEQ_TEXT:
   case FLUID_SEQ_TIMER:
 	  /* nothing in fluidsynth */
   	break;

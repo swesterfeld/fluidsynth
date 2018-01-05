@@ -610,7 +610,7 @@ int main(int argc, char** argv)
     synth = new_fluid_synth(settings);
 
     /* Create the MIDI router and pass events to the synthesizer */
-    router = new_fluid_midi_router (settings, fluid_synth_handle_midi_event, synth);
+    router = new_fluid_midi_router (settings, fluid_synth_handle_event, synth);
 
     /* Clear default rules */
     fluid_midi_router_clear_rules (router);

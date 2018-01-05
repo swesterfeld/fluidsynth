@@ -619,7 +619,7 @@ int main(int argc, char** argv)
 
     router = new_fluid_midi_router(
       settings,
-      dump ? fluid_midi_dump_postrouter : fluid_synth_handle_midi_event,
+      dump ? fluid_midi_dump_postrouter : fluid_synth_handle_event,
       (void*)synth);
 
     if (router == NULL) {

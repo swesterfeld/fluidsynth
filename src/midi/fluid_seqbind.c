@@ -155,19 +155,3 @@ fluid_seq_fluidsynth_callback(unsigned int time, fluid_event_t* evt, fluid_seque
 	}
 }
 
-static fluid_seq_id_t get_fluidsynth_dest(fluid_sequencer_t* seq) 
-{
-	int i;
-	fluid_seq_id_t id;
-	char* name;
-	int j = fluid_sequencer_count_clients(seq);
-	for (i = 0; i < j; i++) {
-		id = fluid_sequencer_get_client_id(seq, i);
-		name = fluid_sequencer_get_client_name(seq, id);
-		if (name && (strcmp(name, "fluidsynth") == 0)) {
-			return id;
-		}
-	}
-	return -1;
-}
-

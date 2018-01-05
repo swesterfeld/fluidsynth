@@ -48,7 +48,7 @@ int fluid_jni_new_synth()
     goto error_recovery;
   }
   
-  _mdriver = new_fluid_midi_driver(_settings, fluid_synth_handle_midi_event, _synth);
+  _mdriver = new_fluid_midi_driver(_settings, fluid_synth_handle_event, _synth);
   if (_mdriver == 0) {
     goto error_recovery;
   }

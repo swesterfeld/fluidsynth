@@ -32,7 +32,6 @@ static int fluid_midi_event_length(unsigned char event);
  * Returns NULL if there was an error reading or allocating memory.
  */
 static char* fluid_file_read_full(fluid_file fp, size_t* length);
-static void fluid_midi_event_set_sysex_LOCAL(fluid_midi_event_t *evt, int type, void *data, int size, int dynamic);
 #define READ_FULL_INITIAL_BUFLEN 1024
 
 
@@ -591,7 +590,7 @@ fluid_midi_file_read_event(fluid_midi_file *mf, fluid_track_t *track)
                 }
                 FLUID_MEMCPY(tmp, metadata, size);
                 
-                fluid_event_sysex_LOCAL(&evt, type, tmp, size, TRUE);
+                fluid_event_text(&evt, tmp, size, TRUE);
                 fluid_track_add_event(track, &evt);
                 mf->dtime = 0;
             }
@@ -775,76 +774,6 @@ fluid_midi_file_get_division(fluid_midi_file *midifile)
  *     fluid_track_t
  */
 
-/**
- * Assign sysex data to a MIDI event structure.
- * @param evt MIDI event structure
- * @param data Pointer to SYSEX data
- * @param size Size of SYSEX data in bytes
- * @param dynamic TRUE if the SYSEX data has been dynamically allocated and
- *   should be freed when the event is freed (only applies if event gets destroyed
- *   with delete_fluid_midi_event())
- * @return Always returns #FLUID_OK
- *
- * @note Unlike the other event assignment functions, this one sets evt->type.
- */
-int
-fluid_midi_event_set_sysex(fluid_midi_event_t *evt, void *data, int size, int dynamic)
-{
-    fluid_midi_event_set_sysex_LOCAL(evt, MIDI_SYSEX, data, size, dynamic);
-    return FLUID_OK;
-}
-
-/**
- * Assign text data to a MIDI event structure.
- * @param evt MIDI event structure
- * @param data Pointer to text data
- * @param size Size of text data in bytes
- * @param dynamic TRUE if the data has been dynamically allocated and
- *   should be freed when the event is freed via delete_fluid_midi_event()
- * @return Always returns #FLUID_OK
- * 
- * @since 2.0.0
- * @note Unlike the other event assignment functions, this one sets evt->type.
- */
-int
-fluid_midi_event_set_text(fluid_midi_event_t *evt, void *data, int size, int dynamic)
-{
-    fluid_midi_event_set_sysex_LOCAL(evt, MIDI_TEXT, data, size, dynamic);
-    return FLUID_OK;
-}
-
-/**
- * Assign lyric data to a MIDI event structure.
- * @param evt MIDI event structure
- * @param data Pointer to lyric data
- * @param size Size of lyric data in bytes
- * @param dynamic TRUE if the data has been dynamically allocated and
- *   should be freed when the event is freed via delete_fluid_midi_event()
- * @return Always returns #FLUID_OK
- * 
- * @since 2.0.0
- * @note Unlike the other event assignment functions, this one sets evt->type.
- */
-int
-fluid_midi_event_set_lyrics(fluid_midi_event_t *evt, void *data, int size, int dynamic)
-{
-    fluid_midi_event_set_sysex_LOCAL(evt, MIDI_LYRIC, data, size, dynamic);
-    return FLUID_OK;
-}
-
-static void fluid_midi_event_set_sysex_LOCAL(fluid_midi_event_t *evt, int type, void *data, int size, int dynamic)
-{
-    evt->type = type;
-    evt->paramptr = data;
-    evt->param1 = size;
-    evt->param2 = dynamic;
-}
-
-/******************************************************
- *
- *     fluid_track_t
- */
-
 /*
  * new_fluid_track
  */
@@ -1007,7 +936,7 @@ fluid_track_send_events(fluid_track_t *track,
         
         if (fluid_event_get_type(event) == FLUID_SEQ_TEMPO)
         {
-            fluid_player_set_midi_tempo(player, fluid_event_get_tempo(event));
+            fluid_player_set_midi_tempo(player, fluid_event_get_value(event));
         }
 
         
@@ -1055,7 +984,7 @@ new_fluid_player(fluid_synth_t *synth)
     player->cur_msec = 0;
     player->cur_ticks = 0;
     player->seek_ticks = -1;    
-    fluid_player_set_playback_callback(player, fluid_synth_handle_midi_event, synth);
+    fluid_player_set_playback_callback(player, fluid_synth_handle_event, synth);
     player->use_system_timer = fluid_settings_str_equal(synth->settings,
             "player.timing-source", "system");
 
@@ -1148,7 +1077,7 @@ fluid_player_add_track(fluid_player_t *player, fluid_track_t *track)
 
 /**
  * Change the MIDI callback function. This is usually set to 
- * fluid_synth_handle_midi_event, but can optionally be changed
+ * fluid_synth_handle_event, but can optionally be changed
  * to a user-defined function instead, for intercepting all MIDI
  * messages sent to the synth. You can also use a midi router as 
  * the callback function to modify the MIDI messages before sending

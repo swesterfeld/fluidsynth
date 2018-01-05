@@ -59,7 +59,10 @@ enum fluid_seq_event_type {
   FLUID_SEQ_KEYPRESSURE,        /**< Polyphonic aftertouch event @since 2.0.0 */
   FLUID_SEQ_SYSTEMRESET,        /**< System reset event @since 1.1.0 */
   FLUID_SEQ_UNREGISTERING,      /**< Called when a sequencer client is being unregistered. @since 1.1.0 */
+  FLUID_SEQ_TEXT,
+  FLUID_SEQ_SYSEX,
 #ifndef __DOXYGEN__
+  FLUID_SEQ_TEMPO,
   FLUID_SEQ_LASTEVENT		/**< @internal Defines the count of events enums @warning This symbol is not part of the public API and ABI stability guarantee and may change at any time! */
 #endif
 };
@@ -108,7 +111,8 @@ FLUIDSYNTH_API void fluid_event_chorus_send(fluid_event_t* evt, int channel, sho
 FLUIDSYNTH_API void fluid_event_key_pressure(fluid_event_t* evt, int channel, short key, short val);
 FLUIDSYNTH_API void fluid_event_channel_pressure(fluid_event_t* evt, int channel, short val);
 FLUIDSYNTH_API void fluid_event_system_reset(fluid_event_t* evt);
-
+FLUIDSYNTH_API void fluid_event_sysex(fluid_event_t* evt, void* data, int len, int auto_destroy);
+FLUIDSYNTH_API void fluid_event_text(fluid_event_t* evt, void* data, int len, int auto_destroy);
 
 /* Only for removing events */
 FLUIDSYNTH_API void fluid_event_any_control_change(fluid_event_t* evt, int channel);

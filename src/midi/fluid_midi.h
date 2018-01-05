@@ -213,22 +213,6 @@ enum fluid_driver_status
 /* From ctype.h */
 #define fluid_isascii(c)    (((c) & ~0x7f) == 0)
 
-
-
-/*
- * fluid_midi_event_t
- */
-struct _fluid_midi_event_t {
-  fluid_midi_event_t* next; /* Link to next event */
-  void *paramptr;           /* Pointer parameter (for SYSEX data), size is stored to param1, param2 indicates if pointer should be freed (dynamic if TRUE) */
-  unsigned int dtime;       /* Delay (ticks) between this and previous event. midi tracks. */
-  unsigned int param1;      /* First parameter */
-  unsigned int param2;      /* Second parameter */
-  unsigned char type;       /* MIDI event type */
-  unsigned char channel;    /* MIDI channel */
-};
-
-
 /*
  * fluid_track_t
  */

@@ -85,7 +85,15 @@ void fluid_event_clone(fluid_event_t* dst, const fluid_event_t* src)
 void
 delete_fluid_event(fluid_event_t* evt)
 {
+  enum fluid_seq_event_type type;
+  
   fluid_return_if_fail(evt != NULL);
+  
+  type = fluid_event_get_type(evt);  
+  if((type == FLUID_SEQ_SYSEX || type == FLUID_SEQ_TEXT) && fluid_event_get_control(evt))
+  {
+      FLUID_FREE(fluid_event_get_data(evt));
+  }
 
   FLUID_FREE(evt);
 }
@@ -471,6 +479,28 @@ fluid_event_system_reset(fluid_event_t* evt)
 }
 
 
+void 
+fluid_event_sysex(fluid_event_t* evt, void* data, int len, int auto_destroy)
+{
+	evt->type = FLUID_SEQ_SYSEX;
+    evt->data = data;
+    evt->param1.control = auto_destroy != 0;
+    evt->param2.value = len;
+}
+
+void fluid_event_text(fluid_event_t* evt, void* data, int len, int auto_destroy)
+{
+	evt->type = FLUID_SEQ_TEXT;
+    evt->data = data;
+    evt->param1.control = auto_destroy != 0;
+    evt->param2.value = len;
+}
+
+void fluid_event_tempo(fluid_event_t* evt, int tempo)
+{
+    evt->type = FLUID_SEQ_TEMPO;
+    evt->param2.value = tempo;
+}
 
 /*
  * Accessing event data
@@ -671,7 +701,7 @@ void fluid_event_to_str(fluid_event_t* evt, char* buf, int len)
                          "cc %i %i %i",
                          fluid_event_get_channel(evt),
                          fluid_event_get_control(evt),
-                         fluid_event_get_val(evt),
+                         fluid_event_get_value(evt)
                         );
         break;
         case FLUID_SEQ_PROGRAMCHANGE:

@@ -74,7 +74,7 @@ struct _fluid_midi_router_rule_t {
  *
  * The MIDI handler callback should process the possibly filtered/modified MIDI
  * events from the MIDI router and forward them on to a synthesizer for example.
- * The function fluid_synth_handle_midi_event() can be used for \a handle and
+ * The function fluid_synth_handle_event() can be used for \a handle and
  * a #fluid_synth_t passed as the \a event_handler_data parameter for this purpose.
  */
 fluid_midi_router_t *
@@ -769,5 +769,5 @@ int fluid_midi_dump_postrouter(void* data, fluid_event_t* event)
     
     fprintf(stdout, "event_post_%s\n", buf);
     
-    return fluid_synth_handle_midi_event((fluid_synth_t*) data, event);
+    return fluid_synth_handle_event((fluid_synth_t*) data, event);
 }
