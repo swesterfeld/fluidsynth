@@ -318,6 +318,8 @@ typedef struct {
   int eot;
   int varlen;
   int dtime;
+  
+  fluid_midi_parser_t* parser;
 } fluid_midi_file;
 
 fluid_midi_file* new_fluid_midi_file(const char* buffer, size_t length);

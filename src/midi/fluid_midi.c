@@ -69,10 +69,19 @@ new_fluid_midi_file(const char* buffer, size_t length)
     mf->eof = FALSE;
 
     if (fluid_midi_file_read_mthd(mf) != FLUID_OK) {
-        FLUID_FREE(mf);
-        return NULL;
+        goto error_rec;
     }
+    
+    if((mf->parser = new_fluid_midi_parser()) == NULL)
+    {
+        goto error_rec;
+    }
+    
     return mf;
+    
+error_rec:
+    delete_fluid_midi_file(mf);
+    return NULL;
 }
 
 static char*
@@ -119,6 +128,8 @@ void
 delete_fluid_midi_file (fluid_midi_file *mf)
 {
     fluid_return_if_fail(mf != NULL);
+    
+    delete_fluid_midi_parser(mf->parser);
     
     FLUID_FREE(mf);
 }
@@ -445,7 +456,6 @@ fluid_midi_file_read_event(fluid_midi_file *mf, fluid_track_t *track)
     unsigned char static_buf[256];
     int nominator, denominator, clocks, notes;
     fluid_event_t evt;
-    int channel = 0;
     int param1 = 0;
     int param2 = 0;
     int size;
@@ -687,74 +697,42 @@ fluid_midi_file_read_event(fluid_midi_file *mf, fluid_track_t *track)
 
     } else { /* channel messages */
 
-        type = status & 0xf0;
-        channel = status & 0x0f;
-
+        fluid_event_t* parser_event;
+        
+        parser_event = fluid_midi_parser_parse(mf->parser, status);
+        if(parser_event != NULL)
+        {
+            FLUID_LOG(FLUID_ERR, "Internal midi file parsing error: Unexpectedly received an event");
+            return FLUID_FAILED;
+        }
+        
         /* all channel message have at least 1 byte of associated data */
         if ((param1 = fluid_midi_file_getc(mf)) < 0) {
             FLUID_LOG(FLUID_ERR, "Unexpected end of file");
             return FLUID_FAILED;
         }
-
-        switch (type) {
-
-            case NOTE_ON:
-                if ((param2 = fluid_midi_file_getc(mf)) < 0) {
-                    FLUID_LOG(FLUID_ERR, "Unexpected end of file");
-                    return FLUID_FAILED;
-                }
-                fluid_event_noteon(&evt, channel, param1, param2);
-                break;
-
-            case NOTE_OFF:
-                if ((param2 = fluid_midi_file_getc(mf)) < 0) {
-                    FLUID_LOG(FLUID_ERR, "Unexpected end of file");
-                    return FLUID_FAILED;
-                }
-                fluid_event_noteoff(&evt, channel, param1 /*, param2 */);
-                break;
-
-            case KEY_PRESSURE:
-                if ((param2 = fluid_midi_file_getc(mf)) < 0) {
-                    FLUID_LOG(FLUID_ERR, "Unexpected end of file");
-                    return FLUID_FAILED;
-                }
-                fluid_event_key_pressure(&evt, channel, param1, param2);
-                break;
-
-            case CONTROL_CHANGE:
-                if ((param2 = fluid_midi_file_getc(mf)) < 0) {
-                    FLUID_LOG(FLUID_ERR, "Unexpected end of file");
-                    return FLUID_FAILED;
-                }
-                fluid_event_control_change(&evt, channel, param1, param2);
-                break;
-
-            case PROGRAM_CHANGE:
-                fluid_event_program_change(&evt, channel, param1);
-                break;
-
-            case CHANNEL_PRESSURE:
-                fluid_event_channel_pressure(&evt, channel, param1);
-                break;
-
-            case PITCH_BEND:
-                if ((param2 = fluid_midi_file_getc(mf)) < 0) {
-                    FLUID_LOG(FLUID_ERR, "Unexpected end of file");
-                    return FLUID_FAILED;
-                }
-
-                param1 = ((param2 & 0x7f) << 7) | (param1 & 0x7f);
-                fluid_event_pitch_bend(&evt, channel, param1);
-                break;
-
-            default:
-                /* Can't possibly happen !? */
+        
+        
+        parser_event = fluid_midi_parser_parse(mf->parser, param1);
+        if(parser_event == NULL)
+        {
+            /* need more data */
+                    
+            if ((param2 = fluid_midi_file_getc(mf)) < 0) {
+                FLUID_LOG(FLUID_ERR, "Unexpected end of file");
+                return FLUID_FAILED;
+            }
+            
+            parser_event = fluid_midi_parser_parse(mf->parser, param2);
+            if(parser_event == NULL)
+            {
                 FLUID_LOG(FLUID_ERR, "Unrecognized MIDI event");
                 return FLUID_FAILED;
+            }
         }
-        fluid_event_set_time(&evt, mf->dtime);
-        fluid_track_add_event(track, &evt);
+        
+        fluid_event_set_time(parser_event, mf->dtime);
+        fluid_track_add_event(track, parser_event);
         mf->dtime = 0;
     }
     return FLUID_OK;
