@@ -267,23 +267,6 @@ fluid_mixer_buffers_render_one(fluid_mixer_buffers_t* buffers,
     fluid_finish_rvoice(buffers, voice);
   }
 }
-/*
-static int fluid_mixer_buffers_replace_voice(fluid_mixer_buffers_t* buffers, 
-			                      fluid_rvoice_t* voice)
-{
-  int i, retval=0;
-  int fvc = buffers->finished_voice_count;
-  for (i=0; i < fvc; i++)
-    if (buffers->finished_voices[i] == voice) {
-      fvc--;
-      if (i < fvc)
-        buffers->finished_voices[i] =  buffers->finished_voices[fvc];
-      retval++;
-    }
-  fvc = buffers->finished_voice_count;
-  return retval;  
-}
-*/
 
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_add_voice)
 {
