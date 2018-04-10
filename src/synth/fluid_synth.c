@@ -802,15 +802,6 @@ new_fluid_synth(fluid_settings_t *settings)
                                     FLUID_REVERB_DEFAULT_WIDTH,
                                     FLUID_REVERB_DEFAULT_LEVEL);
   
-  /* Initialize multi-core variables if multiple cores enabled */
-  if (synth->cores > 1)
-  {
-    int prio_level = 0;
-    fluid_settings_getint (synth->settings, "audio.realtime-prio", &prio_level);
-    fluid_synth_update_mixer(synth, fluid_rvoice_mixer_set_threads, 
-			     synth->cores-1, prio_level);
-  }
-
   synth->bank_select = FLUID_BANK_STYLE_GS;
   if (fluid_settings_str_equal (settings, "synth.midi-bank-select", "gm"))
     synth->bank_select = FLUID_BANK_STYLE_GM;

@@ -63,8 +63,6 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_reverb_params);
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_reset_reverb);
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_reset_chorus);
 
-DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_threads);
-
 
 void fluid_rvoice_mixer_set_mix_fx(fluid_rvoice_mixer_t* mixer, int on);
 #ifdef LADSPA
