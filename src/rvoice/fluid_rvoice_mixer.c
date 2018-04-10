@@ -145,36 +145,6 @@ void fluid_rvoice_mixer_set_finished_voices_callback(
 }
 
 
-
-/**
- * Synthesize one voice and add to buffer.
- * NOTE: If return value is less than blockcount*FLUID_BUFSIZE, that means 
- * voice has been finished, removed and possibly replaced with another voice.
- * @return Number of samples written 
- */
-static int
-fluid_mix_one(fluid_rvoice_t* rvoice, fluid_real_t** bufs, unsigned int bufcount, int blockcount)
-{
-  int i, result = 0;
-
-  FLUID_DECLARE_VLA(fluid_real_t, local_buf, FLUID_BUFSIZE*blockcount);
-
-  for (i=0; i < blockcount; i++) {
-    int s = fluid_rvoice_write(rvoice, &local_buf[FLUID_BUFSIZE*i]);
-    if (s == -1) {
-      s = FLUID_BUFSIZE; /* Voice is quiet, TODO: optimize away memset/mix */
-      FLUID_MEMSET(&local_buf[FLUID_BUFSIZE*i], 0, FLUID_BUFSIZE*sizeof(fluid_real_t));
-    } 
-    result += s;
-    if (s < FLUID_BUFSIZE) {
-      break;
-    }
-  }
-  fluid_rvoice_buffers_mix(&rvoice->buffers, local_buf, result, bufs, bufcount);
-
-  return result;
-}
-
 /**
  * Glue to get fluid_rvoice_buffers_mix what it wants
  * Note: Make sure outbufs has 2 * (buf_count + fx_buf_count) elements before calling
@@ -257,16 +227,6 @@ static FLUID_INLINE void fluid_rvoice_mixer_process_finished_voices(fluid_rvoice
   fluid_mixer_buffer_process_finished_voices(&mixer->buffers);
 }
 
-static FLUID_INLINE void
-fluid_mixer_buffers_render_one(fluid_mixer_buffers_t* buffers, 
-			       fluid_rvoice_t* voice, fluid_real_t** bufs, 
-			       unsigned int bufcount)
-{
-  int s = fluid_mix_one(voice, bufs, bufcount, buffers->mixer->current_blockcount);
-  if (s < buffers->mixer->current_blockcount * FLUID_BUFSIZE) {
-    fluid_finish_rvoice(buffers, voice);
-  }
-}
 
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_add_voice)
 {
@@ -343,17 +303,51 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_polyphony)
 static void 
 fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
 {
-  int i;
-  FLUID_DECLARE_VLA(fluid_real_t*, bufs, 
-		    mixer->buffers.buf_count * 2 + mixer->buffers.fx_buf_count * 2);
-  int bufcount = fluid_mixer_buffers_prepare(&mixer->buffers, bufs);
-  fluid_profile_ref_var(prof_ref);
-  for (i=0; i < mixer->active_voices; i++) {
-    fluid_mixer_buffers_render_one(&mixer->buffers, mixer->rvoices[i], bufs, 
-				   bufcount);
-    fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref,1,
-	              mixer->current_blockcount * FLUID_BUFSIZE);
-  }
+    int i;
+    
+    fluid_profile_ref_var(prof_ref);
+    for (i=0; i < mixer->active_voices; i++)
+    {
+        fluid_rvoice_t* rvoice = mixer->rvoices[i];
+        
+        int j, samples = 0;
+        FLUID_DECLARE_VLA(fluid_real_t, local_buf, FLUID_BUFSIZE*mixer->current_blockcount);
+        
+        /**
+        * Synthesize one voice and add to buffer.
+        * NOTE: If return value is less than blockcount*FLUID_BUFSIZE, that means 
+        * voice has been finished, removed and possibly replaced with another voice.
+        * @return Number of samples written 
+        */
+        for (j=0; j < mixer->current_blockcount; j++)
+        {
+            int s = fluid_rvoice_write(rvoice, &local_buf[FLUID_BUFSIZE*j]);
+            
+            if (s == -1)
+            {
+                s = FLUID_BUFSIZE; /* Voice is quiet, TODO: optimize away memset/mix */
+                FLUID_MEMSET(&local_buf[FLUID_BUFSIZE*j], 0, FLUID_BUFSIZE*sizeof(fluid_real_t));
+            }
+            samples += s;
+            if (s < FLUID_BUFSIZE)
+            {
+                break;
+            }
+        }
+        
+        FLUID_DECLARE_VLA(fluid_real_t*, bufs, mixer->buffers.buf_count * 2 + mixer->buffers.fx_buf_count * 2);
+        int bufcount = fluid_mixer_buffers_prepare(&mixer->buffers, bufs);
+        fluid_rvoice_buffers_mix(&rvoice->buffers, local_buf, samples, bufs, bufcount);
+        
+        
+        if (samples < mixer->current_blockcount * FLUID_BUFSIZE)
+        {
+            fluid_finish_rvoice(&mixer->buffers, rvoice);
+            
+        }
+    }
+    
+    fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref, 1, mixer->current_blockcount * FLUID_BUFSIZE);
 }
 
 
