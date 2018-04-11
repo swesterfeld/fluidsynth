@@ -303,10 +303,13 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_polyphony)
 static void 
 fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
 {
+    const int active_voice_count = mixer->active_voices;
+    const int thread_count = active_voice_count >= VOICES_PER_THREAD ? : 4 : 1/*mixer->thread_count*/;
     int i;
-    
     fluid_profile_ref_var(prof_ref);
-    for (i=0; i < mixer->active_voices; i++)
+    
+    #pragma omp parallel for schedule(static) default(none) num_threads(thread_count) private(i) firstprivate(mixer, active_voice_count)
+    for (i=0; i < active_voice_count; i++)
     {
         fluid_rvoice_t* rvoice = mixer->rvoices[i];
         
@@ -345,9 +348,13 @@ fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
             fluid_finish_rvoice(&mixer->buffers, rvoice);
             
         }
+       
+#if WITH_PROFILING
+        #pragma omp critical
+        fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref, 1, mixer->current_blockcount * FLUID_BUFSIZE);
+#endif
     }
     
-    fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref, 1, mixer->current_blockcount * FLUID_BUFSIZE);
 }
 
 
