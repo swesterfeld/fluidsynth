@@ -300,11 +300,64 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_polyphony)
 }
 
 
+static FLUID_INLINE fluid_real_t* 
+get_dest_buf(fluid_rvoice_buffers_t* buffers, int index,
+             fluid_real_t** dest_bufs, int dest_bufcount)
+{
+  int j = buffers->bufs[index].mapping;
+  if (j >= dest_bufcount || j < 0) return NULL;
+  return dest_bufs[j];
+}
+
+/**
+ * Mix data down to buffers
+ *
+ * @param buffers Destination buffer(s)
+ * @param dsp_buf Mono sample source
+ * @param samplecount Number of samples to process (no FLUID_BUFSIZE restriction)
+ * @param dest_bufs Array of buffers to mixdown to
+ * @param dest_bufcount Length of dest_bufs
+ */
+static void 
+fluid_rvoice_buffers_mix(fluid_rvoice_buffers_t* buffers, 
+                         fluid_real_t* dsp_buf, int samplecount, 
+                         fluid_real_t** dest_bufs, int dest_bufcount)
+{
+  int bufcount = buffers->count;
+  int i, dsp_i;
+  if (!samplecount || !bufcount || !dest_bufcount) 
+    return;
+
+  for (i=0; i < bufcount; i++) {
+    fluid_real_t* buf = get_dest_buf(buffers, i, dest_bufs, dest_bufcount);
+    fluid_real_t* next_buf;
+    fluid_real_t amp = buffers->bufs[i].amp;
+    if (buf == NULL || amp == 0.0f)
+      continue;
+
+    /* Optimization for centered stereo samples - we can save one 
+       multiplication per sample */
+    next_buf = (i+1 >= bufcount ? NULL : get_dest_buf(buffers, i+1, dest_bufs, dest_bufcount));
+    if (next_buf && buffers->bufs[i+1].amp == amp) {
+      for (dsp_i = 0; dsp_i < samplecount; dsp_i++) {
+        fluid_real_t samp = amp * dsp_buf[dsp_i]; 
+        buf[dsp_i] += samp;
+        next_buf[dsp_i] += samp;
+      }
+      i++;
+    }
+    else {
+      for (dsp_i = 0; dsp_i < samplecount; dsp_i++)
+        buf[dsp_i] += amp * dsp_buf[dsp_i];
+    }
+  }
+}
+
 static void 
 fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
 {
     const int active_voice_count = mixer->active_voices;
-    const int thread_count = active_voice_count >= VOICES_PER_THREAD ? : 4 : 1/*mixer->thread_count*/;
+    const int thread_count = active_voice_count >= VOICES_PER_THREAD ? 4 : 1/*mixer->thread_count*/;
     int i;
     fluid_profile_ref_var(prof_ref);
     
