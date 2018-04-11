@@ -2208,15 +2208,11 @@ fluid_synth_set_preset (fluid_synth_t *synth, int chan, fluid_preset_t *preset)
 
 /* Get a preset by SoundFont, bank and program numbers.
  * Returns preset pointer or NULL.
- *
- * @note The returned preset has been allocated, caller owns it and should
- *       free it when finished using it.
  */
 static fluid_preset_t*
 fluid_synth_get_preset(fluid_synth_t* synth, unsigned int sfontnum,
                        unsigned int banknum, unsigned int prognum)
 {
-  fluid_preset_t *preset = NULL;
   fluid_sfont_t *sfont;
   fluid_list_t *list;
 
@@ -2228,27 +2224,20 @@ fluid_synth_get_preset(fluid_synth_t* synth, unsigned int sfontnum,
 
     if (fluid_sfont_get_id (sfont) == sfontnum)
     {
-      preset = fluid_sfont_get_preset (sfont,
-                                       banknum - sfont->bankofs, prognum);
-      if (preset) sfont->refcount++;       /* Add reference to SoundFont */
-      break;
+      return fluid_sfont_get_preset (sfont, banknum - sfont->bankofs, prognum);
     }
   }
 
-  return preset;
+  return NULL;
 }
 
 /* Get a preset by SoundFont name, bank and program.
  * Returns preset pointer or NULL.
- *
- * @note The returned preset has been allocated, caller owns it and should
- *       free it when finished using it.
  */
 static fluid_preset_t*
 fluid_synth_get_preset_by_sfont_name(fluid_synth_t* synth, const char *sfontname,
                                      unsigned int banknum, unsigned int prognum)
 {
-  fluid_preset_t *preset = NULL;
   fluid_sfont_t *sfont;
   fluid_list_t *list;
 
@@ -2257,42 +2246,35 @@ fluid_synth_get_preset_by_sfont_name(fluid_synth_t* synth, const char *sfontname
 
     if (FLUID_STRCMP (fluid_sfont_get_name (sfont), sfontname) == 0)
     {
-      preset = fluid_sfont_get_preset (sfont,
-                                       banknum - sfont->bankofs, prognum);
-      if (preset) sfont->refcount++;       /* Add reference to SoundFont */
-      break;
+      return fluid_sfont_get_preset (sfont, banknum - sfont->bankofs, prognum);
     }
   }
 
-  return preset;
+  return NULL;
 }
 
 /* Find a preset by bank and program numbers.
  * Returns preset pointer or NULL.
- *
- * @note The returned preset has been allocated, caller owns it and should
- *       free it when finished using it. */
+ */
 fluid_preset_t*
 fluid_synth_find_preset(fluid_synth_t* synth, unsigned int banknum,
                         unsigned int prognum)
 {
-  fluid_preset_t *preset = NULL;
+  fluid_preset_t *preset;
   fluid_sfont_t *sfont;
   fluid_list_t *list;
 
   for (list = synth->sfont; list; list = fluid_list_next (list)) {
     sfont = fluid_list_get (list);
 
-    preset = fluid_sfont_get_preset (sfont,
-                                     banknum - sfont->bankofs, prognum);
+    preset = fluid_sfont_get_preset (sfont, banknum - sfont->bankofs, prognum);
     if (preset)
     {
-      sfont->refcount++;       /* Add reference to SoundFont */
-      break;
+      return preset;
     }
   }
 
-  return preset;
+  return NULL;
 }
 
 /**
@@ -2511,7 +2493,7 @@ fluid_synth_program_select(fluid_synth_t* synth, int chan, unsigned int sfont_id
   FLUID_API_RETURN_IF_CHAN_DISABLED(FLUID_FAILED);
   
   channel = synth->channel[chan];
-  	  /* ++ Allocate preset */
+  
 	  preset = fluid_synth_get_preset (synth, sfont_id, bank_num, preset_num);
 
 	  if (preset == NULL) {
@@ -2553,7 +2535,7 @@ fluid_synth_program_select_by_sfont_name (fluid_synth_t* synth, int chan,
   FLUID_API_RETURN_IF_CHAN_DISABLED(FLUID_FAILED);
   
   channel = synth->channel[chan];
-	  /* ++ Allocate preset */
+  
 	  preset = fluid_synth_get_preset_by_sfont_name (synth, sfont_name, bank_num,
 													 preset_num);
 	  if (preset == NULL) {
