@@ -704,7 +704,7 @@ new_fluid_synth(fluid_settings_t *settings)
   /* Allocate event queue for rvoice mixer */
   /* In an overflow situation, a new voice takes about 50 spaces in the queue! */
   synth->eventhandler = new_fluid_rvoice_eventhandler(synth->polyphony*64,
-	synth->polyphony, nbuf, synth->effects_channels, synth->sample_rate);
+	synth->polyphony, synth->cores, nbuf, synth->effects_channels, synth->sample_rate);
 
   if (synth->eventhandler == NULL)
     goto error_recovery; 

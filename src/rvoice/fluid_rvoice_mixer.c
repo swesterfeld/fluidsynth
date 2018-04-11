@@ -72,11 +72,16 @@ struct _fluid_rvoice_mixer_t {
   int polyphony; /**< Read-only: Length of voices array */
   int active_voices; /**< Read-only: Number of non-null voices */
   int current_blockcount;      /**< Read-only: how many blocks to process this time */
+  int thread_count;
 
 #ifdef LADSPA
   fluid_ladspa_fx_t* ladspa_fx; /**< Used by mixer only: Effects unit for LADSPA support. Never created or freed */
 #endif
 };
+
+
+static void fluid_mixer_buffers_reduce(fluid_mixer_buffers_t** bufs, int begin, int end, int blockcount);
+static void fluid_rvoice_mixer_buffers_mix_destination_buffers(fluid_mixer_buffers_t* dst, fluid_mixer_buffers_t* src, int current_blockcount);
 
 static FLUID_INLINE void 
 fluid_rvoice_mixer_process_fx(fluid_rvoice_mixer_t* mixer)
@@ -299,18 +304,8 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_polyphony)
   return /*FLUID_OK*/;
 }
 
-
-static FLUID_INLINE fluid_real_t* 
-get_dest_buf(fluid_rvoice_buffers_t* buffers, int index,
-             fluid_real_t** dest_bufs, int dest_bufcount)
-{
-  int j = buffers->bufs[index].mapping;
-  if (j >= dest_bufcount || j < 0) return NULL;
-  return dest_bufs[j];
-}
-
 /**
- * Mix data down to buffers
+ * Mix mono voice \c dsp_buf down to \c dest_bufs
  *
  * @param buffers Destination buffer(s)
  * @param dsp_buf Mono sample source
@@ -320,37 +315,38 @@ get_dest_buf(fluid_rvoice_buffers_t* buffers, int index,
  */
 static void 
 fluid_rvoice_buffers_mix(fluid_rvoice_buffers_t* buffers, 
-                         fluid_real_t* dsp_buf, int samplecount, 
+                         fluid_real_t *FLUID_RESTRICT dsp_buf, int samplecount, 
                          fluid_real_t** dest_bufs, int dest_bufcount)
 {
-  int bufcount = buffers->count;
-  int i, dsp_i;
-  if (!samplecount || !bufcount || !dest_bufcount) 
-    return;
+    int bufcount = buffers->count;
+    int i, j, dsp_i;
+    
+    if (!samplecount || !bufcount || !dest_bufcount) 
+        return;
 
-  for (i=0; i < bufcount; i++) {
-    fluid_real_t* buf = get_dest_buf(buffers, i, dest_bufs, dest_bufcount);
-    fluid_real_t* next_buf;
-    fluid_real_t amp = buffers->bufs[i].amp;
-    if (buf == NULL || amp == 0.0f)
-      continue;
-
-    /* Optimization for centered stereo samples - we can save one 
-       multiplication per sample */
-    next_buf = (i+1 >= bufcount ? NULL : get_dest_buf(buffers, i+1, dest_bufs, dest_bufcount));
-    if (next_buf && buffers->bufs[i+1].amp == amp) {
-      for (dsp_i = 0; dsp_i < samplecount; dsp_i++) {
-        fluid_real_t samp = amp * dsp_buf[dsp_i]; 
-        buf[dsp_i] += samp;
-        next_buf[dsp_i] += samp;
-      }
-      i++;
+    for (i=0; i < bufcount; i++)
+    {
+        fluid_real_t *FLUID_RESTRICT buf;
+        fluid_real_t amp = buffers->bufs[i].amp;
+        j = buffers->bufs[i].mapping;
+        
+        if (FLUID_UNLIKELY(0 > j || j >= dest_bufcount))
+        {
+            FLUID_LOG(FLUID_ERR, "THIS SHOULD NEVER HAPPEN: rvoice mapping out of range");
+            continue;
+        }
+        
+        buf = dest_bufs[j];
+        if(amp == 0.0f || buf == NULL)
+        {
+            continue;
+        }
+        
+        for (dsp_i = 0; dsp_i < samplecount; dsp_i++)
+        {
+            buf[dsp_i] += amp * dsp_buf[dsp_i];
+        }
     }
-    else {
-      for (dsp_i = 0; dsp_i < samplecount; dsp_i++)
-        buf[dsp_i] += amp * dsp_buf[dsp_i];
-    }
-  }
 }
 
 static void 
@@ -358,56 +354,133 @@ fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
 {
     const int active_voice_count = mixer->active_voices;
     const int thread_count = active_voice_count >= VOICES_PER_THREAD ? 4 : 1/*mixer->thread_count*/;
-    int i;
+    
+    const int current_blockcount = mixer->current_blockcount;
     fluid_profile_ref_var(prof_ref);
     
-    #pragma omp parallel for schedule(static) default(none) num_threads(thread_count) private(i) firstprivate(mixer, active_voice_count)
-    for (i=0; i < active_voice_count; i++)
+    #pragma omp parallel default(none) num_threads(thread_count) firstprivate(mixer, active_voice_count, current_blockcount)
     {
-        fluid_rvoice_t* rvoice = mixer->rvoices[i];
+        fluid_mixer_buffers_t *my_local_buffer = &mixer->buffers/*[omp_get_thread_num()]*/;
+        int i;
         
-        int j, samples = 0;
-        FLUID_DECLARE_VLA(fluid_real_t, local_buf, FLUID_BUFSIZE*mixer->current_blockcount);
-        
-        /**
-        * Synthesize one voice and add to buffer.
-        * NOTE: If return value is less than blockcount*FLUID_BUFSIZE, that means 
-        * voice has been finished, removed and possibly replaced with another voice.
-        * @return Number of samples written 
-        */
-        for (j=0; j < mixer->current_blockcount; j++)
+        #pragma omp for schedule(static)
+        for (i=0; i < active_voice_count; i++)
         {
-            int s = fluid_rvoice_write(rvoice, &local_buf[FLUID_BUFSIZE*j]);
+            fluid_rvoice_t* rvoice = mixer->rvoices[i];
             
-            if (s == -1)
-            {
-                s = FLUID_BUFSIZE; /* Voice is quiet, TODO: optimize away memset/mix */
-                FLUID_MEMSET(&local_buf[FLUID_BUFSIZE*j], 0, FLUID_BUFSIZE*sizeof(fluid_real_t));
-            }
-            samples += s;
-            if (s < FLUID_BUFSIZE)
-            {
-                break;
-            }
-        }
-        
-        FLUID_DECLARE_VLA(fluid_real_t*, bufs, mixer->buffers.buf_count * 2 + mixer->buffers.fx_buf_count * 2);
-        int bufcount = fluid_mixer_buffers_prepare(&mixer->buffers, bufs);
-        fluid_rvoice_buffers_mix(&rvoice->buffers, local_buf, samples, bufs, bufcount);
-        
-        
-        if (samples < mixer->current_blockcount * FLUID_BUFSIZE)
-        {
-            fluid_finish_rvoice(&mixer->buffers, rvoice);
+            int j, samples = 0;
+            FLUID_DECLARE_VLA(fluid_real_t, local_buf, FLUID_BUFSIZE*current_blockcount);
             
+            /**
+             * Synthesize one voice and add to buffer.
+             * NOTE: If return value is less than blockcount*FLUID_BUFSIZE, that means 
+             * voice has been finished, removed and possibly replaced with another voice.
+             * @return Number of samples written 
+             */
+            for (j=0; j < current_blockcount; j++)
+            {
+                int s = fluid_rvoice_write(rvoice, &local_buf[FLUID_BUFSIZE*j]);
+                
+                if (s == -1)
+                {
+                    s = FLUID_BUFSIZE; /* Voice is quiet, TODO: optimize away memset/mix */
+                    FLUID_MEMSET(&local_buf[FLUID_BUFSIZE*j], 0, FLUID_BUFSIZE*sizeof(fluid_real_t));
+                }
+                samples += s;
+                if (s < FLUID_BUFSIZE)
+                {
+                    break;
+                }
+            }
+            
+            FLUID_DECLARE_VLA(fluid_real_t*, bufs, my_local_buffer->buf_count * 2 + my_local_buffer->fx_buf_count * 2);
+            int bufcount = fluid_mixer_buffers_prepare(my_local_buffer, bufs);
+            fluid_rvoice_buffers_mix(&rvoice->buffers, local_buf, samples, bufs, bufcount);
+            
+            
+            if (samples < current_blockcount * FLUID_BUFSIZE)
+            {
+                fluid_finish_rvoice(my_local_buffer, rvoice);
+            }
+        
+    #if WITH_PROFILING
+            #pragma omp critical
+            fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref, 1, current_blockcount * FLUID_BUFSIZE);
+    #endif
         }
-       
-#if WITH_PROFILING
-        #pragma omp critical
-        fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref, 1, mixer->current_blockcount * FLUID_BUFSIZE);
-#endif
+        /*** implicit omp barrier ***/
+        
+    #pragma omp single
+//     fluid_mixer_buffers_reduce(mixer->buffers, 0, thread_count, current_blockcount);
     }
     
+}
+
+static void fluid_mixer_buffers_reduce(fluid_mixer_buffers_t** bufs, int begin, int end, int blockcount)
+{
+    if (end - begin == 1)
+    {
+        return;
+    }
+    else
+    {
+        int pivot = (begin + end) / 2;
+        #pragma omp task
+        fluid_mixer_buffers_reduce(bufs, begin, pivot, blockcount);
+        #pragma omp task
+        fluid_mixer_buffers_reduce(bufs, pivot, end, blockcount);
+
+        #pragma omp taskwait
+        fluid_rvoice_mixer_buffers_mix_destination_buffers(bufs[begin], bufs[pivot], blockcount);
+    }
+}
+
+static void fluid_rvoice_mixer_buffers_mix_destination_buffers(fluid_mixer_buffers_t* dst, fluid_mixer_buffers_t* src, int current_blockcount)
+{
+    int i,j;
+    
+    for (i=0; i < src->buf_count; i++)
+    {
+        for (j=0; j < current_blockcount * FLUID_BUFSIZE; j++)
+        {
+            dst->left_buf[i][j] += src->left_buf[i][j];
+        }
+    }
+    
+    for (i=0; i < src->buf_count; i++)
+    {
+        for (j=0; j < current_blockcount * FLUID_BUFSIZE; j++)
+        {
+            dst->right_buf[i][j] += src->right_buf[i][j];
+        }
+    }
+    
+    for (i=0; i < src->fx_buf_count; i++)
+    {
+        for (j=0; j < current_blockcount * FLUID_BUFSIZE; j++)
+        {
+            dst->fx_left_buf[i][j] += src->fx_left_buf[i][j];
+        }
+    }
+    
+    for (i=0; i < src->fx_buf_count; i++)
+    {
+        for (j=0; j < current_blockcount * FLUID_BUFSIZE; j++)
+        {
+            dst->fx_right_buf[i][j] += src->fx_right_buf[i][j];
+        }
+    }
+    
+    if(FLUID_LIKELY(dst->mixer->polyphony > dst->finished_voice_count + src->finished_voice_count))
+    {
+        FLUID_MEMCPY(&dst->finished_voices[dst->finished_voice_count], &src->finished_voices[0], sizeof(*src->finished_voices) * src->finished_voice_count);
+        dst->finished_voice_count += src->finished_voice_count;
+        src->finished_voice_count = 0;
+    }
+    else
+    {
+        FLUID_LOG(FLUID_ERR, "THIS SHOULD NEVER HAPPEN: Exceeding finished voices array in fluid_rvoice_mixer_buffers_mix_destination_buffers(), unable to recover, voices leaked.");
+    }
 }
 
 
@@ -529,7 +602,7 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_samplerate)
  * @param fx_buf_count number of stereo effect buffers
  */
 fluid_rvoice_mixer_t* 
-new_fluid_rvoice_mixer(int buf_count, int fx_buf_count, fluid_real_t sample_rate)
+new_fluid_rvoice_mixer(int thread_count, int buf_count, int fx_buf_count, fluid_real_t sample_rate)
 {
   fluid_rvoice_mixer_t* mixer = FLUID_NEW(fluid_rvoice_mixer_t);
   if (mixer == NULL) {
@@ -537,6 +610,9 @@ new_fluid_rvoice_mixer(int buf_count, int fx_buf_count, fluid_real_t sample_rate
     return NULL;
   }
   FLUID_MEMSET(mixer, 0, sizeof(fluid_rvoice_mixer_t));
+  
+  mixer->thread_count = thread_count;
+  
   mixer->buffers.buf_count = buf_count;
   mixer->buffers.fx_buf_count = fx_buf_count;
   mixer->buffers.buf_blocks = FLUID_MIXER_MAX_BUFFERS_DEFAULT;
