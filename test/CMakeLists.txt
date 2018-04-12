@@ -9,6 +9,7 @@ ADD_FLUID_TEST(test_sample_cache)
 ADD_FLUID_TEST(test_sfont_loading)
 ADD_FLUID_TEST(test_defsfont_preset_iteration)
 ADD_FLUID_TEST(test_sample_rate_change)
+ADD_FLUID_TEST(test_pointer_alignment)
 
 
 add_custom_target(check
@@ -18,4 +19,5 @@ test_sample_cache
 test_sfont_loading
 test_defsfont_preset_iteration
 test_sample_rate_change
+test_pointer_alignment
 )
