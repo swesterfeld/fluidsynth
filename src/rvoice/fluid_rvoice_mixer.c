@@ -410,7 +410,7 @@ fluid_render_loop_singlethread(fluid_rvoice_mixer_t* mixer)
         }
         /*** implicit omp barrier ***/
         
-    #pragma omp single
+//     #pragma omp single
 //     fluid_mixer_buffers_reduce(mixer->buffers, 0, thread_count, current_blockcount);
     }
     

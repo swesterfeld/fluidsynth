@@ -386,9 +386,9 @@ fluid_rvoice_write (fluid_rvoice_t* voice, fluid_real_t *dsp_buf)
       break;
   }
   fluid_check_fpe ("voice_write interpolation");
-  if (count == 0)
-    return count;
-
+  
+  if (count > 0)
+  {
   /*************** resonant filter ******************/
   
   fluid_iir_filter_calc(&voice->resonant_filter, voice->dsp.output_rate,
@@ -400,6 +400,7 @@ fluid_rvoice_write (fluid_rvoice_t* voice, fluid_real_t *dsp_buf)
   /* additional custom filter - only uses the fixed modulator, no lfos... */
   fluid_iir_filter_calc(&voice->resonant_custom_filter, voice->dsp.output_rate, 0);
   fluid_iir_filter_apply(&voice->resonant_custom_filter, dsp_buf, count);
+  }
   
   return count;
 }

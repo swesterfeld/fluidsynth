@@ -199,6 +199,9 @@
 /* Define to do all DSP in single floating point precision */
 #cmakedefine WITH_FLOAT @WITH_FLOAT@
 
+/* Define if compiling with openMP to enable parallel audio rendering */
+#cmakedefine WITH_OPENMP @WITH_OPENMP@
+
 /* Define to profile the DSP code */
 #cmakedefine WITH_PROFILING @WITH_PROFILING@
 
