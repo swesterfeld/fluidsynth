@@ -75,16 +75,16 @@ struct _fluid_mixer_fx_t {
 struct _fluid_rvoice_mixer_t {
   fluid_mixer_fx_t fx;
 
-  fluid_mixer_buffers_t** buffers;
-  void (*remove_voice_callback)(void*, fluid_rvoice_t*); /**< Used by mixer only: Receive this callback every time a voice is removed */
-  void* remove_voice_callback_userdata;
+  int polyphony; /**< Length of voices array */
+  int active_voices; /**< Number of non-null voices */
+  int current_blockcount;      /**< how many blocks to process this time */
 
-  fluid_rvoice_t** rvoices; /**< Read-only: Voices array, sorted so that all nulls are last */
-  int polyphony; /**< Read-only: Length of voices array */
-  int active_voices; /**< Read-only: Number of non-null voices */
-  int current_blockcount;      /**< Read-only: how many blocks to process this time */
   int thread_count;
+  fluid_mixer_buffers_t** buffers; /**< array of \c thread_count mixdown buffers (i.e. one for each thread). buffers[0] is the "master" buffer and always contains the latest rendered audio data. */
 
+  fluid_rvoice_t** rvoices; /**< Voices array, sorted so that all nulls are last */
+  fluid_rvoice_eventhandler_t* remove_voice_callback_userdata;
+  
 #ifdef LADSPA
   fluid_ladspa_fx_t* ladspa_fx; /**< Used by mixer only: Effects unit for LADSPA support. Never created or freed */
 #endif
@@ -162,20 +162,6 @@ fluid_mixer_buffers_zero(fluid_mixer_buffers_t* buffers, int current_blockcount)
 }
 
 /**
- * During rendering, rvoices might be finished. Set this callback
- * for getting a callback any time the rvoice is finished.
- */
-void fluid_rvoice_mixer_set_finished_voices_callback(
-  fluid_rvoice_mixer_t* mixer,
-  void (*func)(void*, fluid_rvoice_t*),
-  void* userdata)
-{
-  mixer->remove_voice_callback_userdata = userdata;
-  mixer->remove_voice_callback = func;
-}
-
-
-/**
  * Glue to get fluid_rvoice_buffers_mix what it wants
  * Note: Make sure outbufs has 2 * (buf_count + fx_buf_count) elements before calling
  */
@@ -245,9 +231,8 @@ fluid_mixer_buffer_process_finished_voices(fluid_mixer_buffers_t* buffers)
           buffers->mixer->rvoices[j] = buffers->mixer->rvoices[*av];
       }
     }
-    if (buffers->mixer->remove_voice_callback)
-      buffers->mixer->remove_voice_callback(
-        buffers->mixer->remove_voice_callback_userdata, v);
+    
+    fluid_rvoice_eventhandler_finished_voice_callback(buffers->mixer->remove_voice_callback_userdata, v);
   }
   buffers->finished_voice_count = 0;
 }
@@ -271,7 +256,7 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_add_voice)
       return;
     }
     if (mixer->rvoices[i]->envlfo.volenv.section == FLUID_VOICE_ENVFINISHED) {
-      fluid_finish_rvoice(&mixer->buffers, mixer->rvoices[i]);
+      fluid_finish_rvoice(mixer->buffers[0], mixer->rvoices[i]);
       mixer->rvoices[i] = voice;
       return; // success
     }
@@ -282,18 +267,36 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_add_voice)
   return;
 }
 
-static int 
-fluid_mixer_buffers_update_polyphony(fluid_mixer_buffers_t* buffers, int value)
+
+static int fluid_rvoice_mixer_set_polyphony_LOCAL(fluid_rvoice_mixer_t* mixer, int polyphony)
 {
   void* newptr;
-
-  if (buffers->finished_voice_count > value) 
+  int i;
+  
+  if (mixer->active_voices > polyphony || mixer->buffers[0]->finished_voice_count > polyphony) 
     return FLUID_FAILED;
   
-  newptr = FLUID_REALLOC(buffers->finished_voices, value * sizeof(fluid_rvoice_t*));
-  if (newptr == NULL && value > 0) 
-    return FLUID_FAILED;
-  buffers->finished_voices = newptr;  
+  newptr = FLUID_REALLOC(mixer->rvoices, polyphony * sizeof(fluid_rvoice_t*));
+  if (newptr == NULL)
+  {
+        FLUID_LOG(FLUID_ERR, "Out of memory");
+        return FLUID_FAILED;
+  }
+  mixer->rvoices = newptr;
+
+  for(i=0; i < mixer->thread_count; i++)
+  {
+    newptr = FLUID_REALLOC(mixer->buffers[i]->finished_voices, polyphony * sizeof(fluid_rvoice_t*));
+    if (newptr == NULL)
+    {
+        FLUID_LOG(FLUID_ERR, "Out of memory");
+        return FLUID_FAILED;
+    }
+    
+    mixer->buffers[i]->finished_voices = newptr;
+  }
+
+  mixer->polyphony = polyphony;
   return FLUID_OK;
 }
 
@@ -303,24 +306,10 @@ fluid_mixer_buffers_update_polyphony(fluid_mixer_buffers_t* buffers, int value)
  */
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_polyphony)
 {
-  void* newptr;
   fluid_rvoice_mixer_t* handler = obj;
   int value = param[0].i;
   
-  if (handler->active_voices > value) 
-    return /*FLUID_FAILED*/;
-
-  newptr = FLUID_REALLOC(handler->rvoices, value * sizeof(fluid_rvoice_t*));
-  if (newptr == NULL) 
-    return /*FLUID_FAILED*/;
-  handler->rvoices = newptr;
-
-  if (fluid_mixer_buffers_update_polyphony(&handler->buffers, value) 
-      == FLUID_FAILED)
-    return /*FLUID_FAILED*/;
-
-  handler->polyphony = value;
-  return /*FLUID_OK*/;
+  fluid_rvoice_mixer_set_polyphony_LOCAL(handler, value);
 }
 
 /**
@@ -511,9 +500,13 @@ fluid_mixer_buffers_init(fluid_rvoice_mixer_t* mixer, int thread_count, int buf_
     if (mixer->buffers == NULL)
     {
         FLUID_LOG(FLUID_ERR, "Out of memory");
-        return FLUID_FAILED;
+        return ret;
     }
     
+    /**
+     * Allocate the mixdown buffers for each thread below. Do this in a parallel region to achieve NUMA-aware
+     * memory allocation.
+     */
     #pragma omp parallel num_threads(thread_count) shared(ret)
     {
         int i
@@ -545,8 +538,8 @@ fluid_mixer_buffers_init(fluid_rvoice_mixer_t* mixer, int thread_count, int buf_
             {
                 #pragma omp critical
                 {
-                FLUID_LOG(FLUID_ERR, "Out of memory");
-                ret = FLUID_FAILED;
+                    FLUID_LOG(FLUID_ERR, "Out of memory");
+                    ret = FLUID_FAILED;
                 }
             }
             else
@@ -569,7 +562,7 @@ fluid_mixer_buffers_init(fluid_rvoice_mixer_t* mixer, int thread_count, int buf_
 DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_samplerate)
 {
   fluid_rvoice_mixer_t* mixer = obj;
-  fluid_real_t samplerate = param[1].real; // becausee fluid_synth_update_mixer() puts real into arg2
+  fluid_real_t samplerate = param[1].real; // because fluid_synth_update_mixer() puts real into arg2
   
   if (mixer->fx.chorus)
     delete_fluid_chorus(mixer->fx.chorus);
@@ -592,7 +585,7 @@ DECLARE_FLUID_RVOICE_FUNCTION(fluid_rvoice_mixer_set_samplerate)
  * @param fx_buf_count number of stereo effect buffers
  */
 fluid_rvoice_mixer_t* 
-new_fluid_rvoice_mixer(int thread_count, int buf_count, int fx_buf_count, fluid_real_t sample_rate)
+new_fluid_rvoice_mixer(int thread_count, int buf_count, int fx_buf_count, fluid_real_t sample_rate, int polyphony, void* userdata)
 {
     fluid_rvoice_mixer_t* mixer = FLUID_NEW(fluid_rvoice_mixer_t);
     if (mixer == NULL) {
@@ -606,6 +599,11 @@ new_fluid_rvoice_mixer(int thread_count, int buf_count, int fx_buf_count, fluid_
         goto error_rec;
     }
     
+    if (fluid_rvoice_mixer_set_polyphony_LOCAL(mixer, polyphony) == FLUID_FAILED)
+    {
+        goto error_rec;
+    }
+    
     /* allocate the reverb module */
     mixer->fx.reverb = new_fluid_revmodel(sample_rate);
     mixer->fx.chorus = new_fluid_chorus(sample_rate);
@@ -614,6 +612,8 @@ new_fluid_rvoice_mixer(int thread_count, int buf_count, int fx_buf_count, fluid_
         FLUID_LOG(FLUID_ERR, "Out of memory");
         goto error_rec;
     }
+    
+    mixer->remove_voice_callback_userdata = userdata;
     
     return mixer;
   

@@ -80,6 +80,7 @@ fluid_rvoice_eventhandler_get_finished_voice(fluid_rvoice_eventhandler_t* handle
   return result;
 }
 
+void fluid_rvoice_eventhandler_finished_voice_callback(fluid_rvoice_eventhandler_t* evth, fluid_rvoice_t* rvoice);
 
 int fluid_rvoice_eventhandler_push_int_real(fluid_rvoice_eventhandler_t* handler, 
                                 fluid_rvoice_function_t method, void* object, int intparam, 

@@ -97,10 +97,8 @@ static int fluid_rvoice_eventhandler_push_LOCAL(fluid_rvoice_eventhandler_t* han
 }
 
 
-static void 
-finished_voice_callback(void* userdata, fluid_rvoice_t* rvoice)
+void fluid_rvoice_eventhandler_finished_voice_callback(fluid_rvoice_eventhandler_t* eventhandler, fluid_rvoice_t* rvoice)
 {
-  fluid_rvoice_eventhandler_t* eventhandler = userdata;
   fluid_rvoice_t** vptr = fluid_ringbuffer_get_inptr(eventhandler->finished_voices, 0);
   if (vptr == NULL)
     return; // Buffer full
@@ -110,7 +108,7 @@ finished_voice_callback(void* userdata, fluid_rvoice_t* rvoice)
 
 fluid_rvoice_eventhandler_t* 
 new_fluid_rvoice_eventhandler(int queuesize, 
-  int finished_voices_size, int thread_count, int bufs, int fx_bufs, fluid_real_t sample_rate)
+  int polyphony, int thread_count, int bufs, int fx_bufs, fluid_real_t sample_rate)
 {
   fluid_rvoice_eventhandler_t* eventhandler = FLUID_NEW(fluid_rvoice_eventhandler_t);
   if (eventhandler == NULL) {
@@ -123,7 +121,7 @@ new_fluid_rvoice_eventhandler(int queuesize,
   
   fluid_atomic_int_set(&eventhandler->queue_stored, 0);
   
-  eventhandler->finished_voices = new_fluid_ringbuffer(finished_voices_size,
+  eventhandler->finished_voices = new_fluid_ringbuffer(polyphony,
                                                        sizeof(fluid_rvoice_t*));
   if (eventhandler->finished_voices == NULL)
     goto error_recovery;
@@ -132,11 +130,10 @@ new_fluid_rvoice_eventhandler(int queuesize,
   if (eventhandler->queue == NULL)
     goto error_recovery;
 
-  eventhandler->mixer = new_fluid_rvoice_mixer(thread_count, bufs, fx_bufs, sample_rate); 
+  eventhandler->mixer = new_fluid_rvoice_mixer(thread_count, bufs, fx_bufs, sample_rate, polyphony, eventhandler); 
   if (eventhandler->mixer == NULL)
     goto error_recovery;
-  fluid_rvoice_mixer_set_finished_voices_callback(eventhandler->mixer, 
-                                        finished_voice_callback, eventhandler);
+  
   return eventhandler;
   
 error_recovery:
