@@ -359,7 +359,7 @@ fluid_midi_file_read_track(fluid_midi_file *mf, fluid_player_t *player, int num)
                     "An non-ascii track header found, corrupt file");
             return FLUID_FAILED;
 
-        } else if (strcmp((char *) id, "MTrk") == 0) {
+        } else if (FLUID_STRCMP((char *) id, "MTrk") == 0) {
 
             found_track = 1;
 
@@ -1462,11 +1462,7 @@ fluid_player_join(fluid_player_t *player)
     } else if (player->sample_timer) {
         /* Busy-wait loop, since there's no thread to wait for... */
         while (player->status != FLUID_PLAYER_DONE) {
-#if defined(WIN32)
-            Sleep(10);
-#else
-            usleep(10000);
-#endif
+            fluid_msleep(10);
         }
     }
     return FLUID_OK;
@@ -1530,10 +1526,8 @@ int fluid_player_get_midi_tempo(fluid_player_t * player)
  *
  */
 
-/**
- * Create a MIDI parser.
- * @return New MIDI parser or NULL when out of memory.
- * @since 1.1.9
+/*
+ * new_fluid_midi_parser
  */
 fluid_midi_parser_t *
 new_fluid_midi_parser ()
@@ -1550,10 +1544,8 @@ new_fluid_midi_parser ()
     return parser;
 }
 
-/**
- * Delete a MIDI parser.
- * @param parser The MIDI parser to delete
- * @since 1.1.9
+/*
+ * delete_fluid_midi_parser
  */
 void
 delete_fluid_midi_parser(fluid_midi_parser_t *parser)
@@ -1564,26 +1556,16 @@ delete_fluid_midi_parser(fluid_midi_parser_t *parser)
 }
 
 /**
- * Parse one character of a MIDI byte stream at a time.
+ * Parse a MIDI stream one character at a time.
  * @param parser Parser instance
  * @param c Next character in MIDI stream
- * @return A parsed MIDI event or NULL if more data required. Event is owned internally, should
- * not be modified or freed and is only valid until next call to this function.
- * @since 1.1.9
- * 
- * Usage example:
- * @code
- * int ret=FLUID_OK;
- * for (i = 0; i < length_of_byte_stream && ret == FLUID_OK; i++)
- * {
- *     fluid_event_t* event = fluid_midi_parser_parse(parser, my_byte_stream[i]);
- *     if (event != NULL)
- *     {
- *         fluid_event_set_dest(event, some_seq_id);
- *         ret = fluid_sequencer_send_now(seq, event);
- *     }
- * }
- * @endcode
+ * @return A parsed MIDI event or NULL if none.  Event is internal and should
+ *   not be modified or freed and is only valid until next call to this function.
+ * @internal Do not expose this function to the public API. It would allow downstream
+ * apps to abuse fluidsynth as midi parser, e.g. feeding it with rawmidi and pull out
+ * the needed midi information using the getter functions of fluid_midi_event_t.
+ * This parser however is incomplete as it e.g. only provides a limited buffer to
+ * store and process SYSEX data (i.e. doesnt allow arbitrary lengths)
  */
 fluid_event_t *
 fluid_midi_parser_parse(fluid_midi_parser_t *parser, unsigned char c)

@@ -128,6 +128,11 @@ set ( libfluidsynth_SOURCES
     sfloader/fluid_ramsfont.c
     sfloader/fluid_ramsfont.h
     sfloader/fluid_sfont.h
+    sfloader/fluid_sfont.c
+    sfloader/fluid_sffile.c
+    sfloader/fluid_sffile.h
+    sfloader/fluid_samplecache.c
+    sfloader/fluid_samplecache.h
     rvoice/fluid_adsr_env.c
     rvoice/fluid_adsr_env.h
     rvoice/fluid_chorus.c
@@ -156,6 +161,7 @@ set ( libfluidsynth_SOURCES
     synth/fluid_mod.h
     synth/fluid_synth.c
     synth/fluid_synth.h
+    synth/fluid_synth_monopoly.c
     synth/fluid_tuning.c
     synth/fluid_tuning.h
     synth/fluid_voice.c
@@ -200,8 +206,30 @@ set ( public_HEADERS
 )
 
 set ( public_main_HEADER
-    ${CMAKE_SOURCE_DIR}/include/fluidsynth.h
+    ${CMAKE_BINARY_DIR}/include/fluidsynth.h
 )
+
+configure_file ( ${CMAKE_SOURCE_DIR}/include/fluidsynth/version.h.in 
+                 ${CMAKE_BINARY_DIR}/include/fluidsynth/version.h )
+configure_file ( ${CMAKE_SOURCE_DIR}/include/fluidsynth.cmake
+                 ${public_main_HEADER} )
+
+if ( WIN32 AND NOT MINGW )
+include(generate_product_version)
+generate_product_version(
+    VersionFilesOutputVariable
+    NAME "Fluidsynth"
+    BUNDLE "Fluidsynth"
+    VERSION_MAJOR ${FLUIDSYNTH_VERSION_MAJOR}
+    VERSION_MINOR ${FLUIDSYNTH_VERSION_MINOR}
+    VERSION_PATCH ${FLUIDSYNTH_VERSION_MICRO}
+    VERSION_REVISION 0
+    COMMENTS "Fluidsynth"
+    COMPANY_NAME "Fluidsynth LGPL"
+    ORIGINAL_FILENAME "libfluidsynth.dll"
+    FILE_DESCRIPTION "Fluidsynth"
+)
+endif ( WIN32 AND NOT MINGW )
 
 link_directories (
     ${GLIB_LIBDIR}
@@ -242,6 +270,7 @@ add_library ( libfluidsynth
     ${libfluidsynth_SOURCES}
     ${public_HEADERS}
     ${public_main_HEADER}
+    ${VersionFilesOutputVariable}
 )
 
 if ( MACOSX_FRAMEWORK )
@@ -261,6 +290,7 @@ if ( MACOSX_FRAMEWORK )
 elseif ( OS2 )
     set_target_properties ( libfluidsynth
       PROPERTIES
+        PUBLIC_HEADER "${public_HEADERS}"
         OUTPUT_NAME "fluidsynth"
         VERSION ${LIB_VERSION_INFO}
         SOVERSION ${LIB_VERSION_CURRENT}
@@ -268,6 +298,7 @@ elseif ( OS2 )
 elseif ( WIN32 )
   set_target_properties ( libfluidsynth
     PROPERTIES
+      PUBLIC_HEADER "${public_HEADERS}"
       ARCHIVE_OUTPUT_NAME "fluidsynth"
       PREFIX "lib"
       OUTPUT_NAME "fluidsynth-${LIB_VERSION_CURRENT}"
@@ -277,6 +308,7 @@ elseif ( WIN32 )
 else ( MACOSX_FRAMEWORK )
   set_target_properties ( libfluidsynth
     PROPERTIES
+      PUBLIC_HEADER "${public_HEADERS}"
       PREFIX "lib"
       OUTPUT_NAME "fluidsynth"
       VERSION ${LIB_VERSION_INFO}
@@ -330,12 +362,15 @@ if ( MACOSX_FRAMEWORK )
   install ( TARGETS fluidsynth libfluidsynth
     RUNTIME DESTINATION ${BIN_INSTALL_DIR}
     FRAMEWORK DESTINATION ${FRAMEWORK_INSTALL_DIR}
+    ARCHIVE DESTINATION ${FRAMEWORK_INSTALL_DIR}
 )
 else ( MACOSX_FRAMEWORK )
   install ( TARGETS fluidsynth libfluidsynth
     RUNTIME DESTINATION ${BIN_INSTALL_DIR}
-    LIBRARY DESTINATION ${LIB_INSTALL_DIR}${LIB_SUFFIX}
-    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}${LIB_SUFFIX}
+    LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
+    PUBLIC_HEADER DESTINATION ${INCLUDE_INSTALL_DIR}/fluidsynth 
 )
+   install ( FILES ${public_main_HEADER} DESTINATION ${INCLUDE_INSTALL_DIR} )
 endif ( MACOSX_FRAMEWORK )
 

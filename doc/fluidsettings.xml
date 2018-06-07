@@ -10,6 +10,8 @@ NOTE: You're not expected to look at this raw XML file. Please open it in a webb
 
 https://stackoverflow.com/a/3839054
 https://stackoverflow.com/a/6251757
+
+Developers: Settings can be deprecated by adding: <deprecated>SOME TEXT</deprecated>
 -->
 <?xml-stylesheet type="text/xsl" href="fluidsettings.xsl"?>
 <fluidsettings>
@@ -41,6 +43,42 @@ https://stackoverflow.com/a/6251757
                 When set to 1 (TRUE) the chorus effects module is activated. Otherwise, no chorus will be added to the output signal. Note that the amount of signal sent to the chorus module depends on the "chorus send" generator defined in the SoundFont.</desc>
         </setting>
         <setting>
+            <name>chorus.depth</name>
+            <type>num</type>
+            <def>8</def>
+            <min>0</min>
+            <max>21</max>
+            <desc>
+                Specifies the modulation depth of the chorus.</desc>
+        </setting>
+        <setting>
+            <name>chorus.level</name>
+            <type>num</type>
+            <def>2</def>
+            <min>0</min>
+            <max>10</max>
+            <desc>
+                Specifies the output amplitude of the chorus signal.</desc>
+        </setting>
+        <setting>
+            <name>chorus.nr</name>
+            <type>int</type>
+            <def>3</def>
+            <min>0</min>
+            <max>99</max>
+            <desc>
+                Sets the voice count of the chorus.</desc>
+        </setting>
+        <setting>
+            <name>chorus.speed</name>
+            <type>num</type>
+            <def>0.3</def>
+            <min>0.29</min>
+            <max>5</max>
+            <desc>
+                Sets the modulation speed in Hz.</desc>
+        </setting>
+        <setting>
             <name>cpu-cores</name>
             <type>int</type>
             <def>1</def>
@@ -50,6 +88,14 @@ https://stackoverflow.com/a/6251757
                 (Experimental) Sets the number of synthesis CPU cores. If set to a value greater than 1, then additional synthesis threads will be created to take advantage of a multi CPU or CPU core system. This has the affect of utilizing more of the total CPU for voices or decreasing render times when synthesizing audio to a file.</desc>
         </setting>
         <setting>
+            <name>default-soundfont</name>
+            <type>str</type>
+            <def>C:\soundfonts\default.sf2 (Windows),<br />
+                 ${CMAKE_INSTALL_PREFIX}/share/soundfonts/default.sf2 (all others)</def>
+            <desc>
+                The default soundfont file to use by the fluidsynth executable. The default value can be overridden during compilation time by setting the DEFAULT_SOUNDFONT cmake variable.</desc>
+        </setting>
+        <setting>
             <name>device-id</name>
             <type>int</type>
             <def>0</def>
@@ -57,6 +103,15 @@ https://stackoverflow.com/a/6251757
             <max>126</max>
             <desc>
                 Device identifier used for SYSEX commands, such as MIDI Tuning Standard commands. Only those SYSEX commands destined for this ID or to all devices will be acted upon.</desc>
+        </setting>
+        <setting>
+            <name>dynamic-sample-loading</name>
+            <type>bool</type>
+            <def>0 (FALSE)</def>
+            <desc>
+                When set to 1 (TRUE), samples are loaded to and unloaded from memory
+                on demand.
+            </desc>
         </setting>
         <setting>
             <name>effects-channels</name>
@@ -80,6 +135,13 @@ https://stackoverflow.com/a/6251757
             <def>0 (FALSE)</def>
             <desc>
                 When set to "yes" the LADSPA subsystem will be enabled. This subsystem allows to load and interconnect LADSPA plug-ins. The output of the synthesizer is processed by the LADSPA subsystem. Note that the synthesizer has to be compiled with LADSPA support. More information about the LADSPA subsystem later.</desc>
+        </setting>
+        <setting>
+            <name>lock-memory</name>
+            <type>bool</type>
+            <def>1 (TRUE)</def>
+            <desc>
+                Page-lock memory that contains audio sample data, if true.</desc>
         </setting>
         <setting>
             <name>midi-channels</name>
@@ -205,17 +267,6 @@ https://stackoverflow.com/a/6251757
             </desc>
         </setting>
         <setting>
-            <name>parallel-render</name>
-            <type>bool</type>
-            <def>1 (TRUE)</def>
-            <desc>
-                This is the low-latency setting. If on, you're allowed to call fluid_synth_write_s16, fluid_synth_write_float, fluid_synth_nwrite_float or fluid_synth_process in parallel with the rest of the calls, and it won't be blocked by time intensive calls to the synth. Turn it off if throughput is more important than latency, e g in rendering-to-file scenarios where underruns is not an issue.
-            </desc>
-            <deprecated>
-                As of 1.1.7 this option is deprecated. This option enforces thread safety for rvoice_mixer, which causes rvoice_events to be queued internally. The current implementation relies on the fact that this option is set to TRUE to correctly render any amount of requested audio. Also calling fluid_synth_write_* in parallel is not considered to be a use-case. It would cause undefined audio output, as it would be unpredictable for the user which rvoice_events specifically would be dispatched to which fluid_synth_write_* call.
-            </deprecated>
-        </setting>
-        <setting>
             <name>polyphony</name>
             <type>int</type>
             <def>256</def>
@@ -233,6 +284,42 @@ https://stackoverflow.com/a/6251757
             </desc>
         </setting>
         <setting>
+            <name>reverb.damp</name>
+            <type>num</type>
+            <def>0</def>
+            <min>0</min>
+            <max>1</max>
+            <desc>
+                Sets the amount of reverb damping.</desc>
+        </setting>
+        <setting>
+            <name>reverb.level</name>
+            <type>num</type>
+            <def>0.9</def>
+            <min>0</min>
+            <max>1</max>
+            <desc>
+                Sets the reverb output amplitude.</desc>
+        </setting>
+        <setting>
+            <name>reverb.room-size</name>
+            <type>num</type>
+            <def>0.2</def>
+            <min>0</min>
+            <max>1</max>
+            <desc>
+                Sets the room size (i.e. amount of wet) reverb.</desc>
+        </setting>
+        <setting>
+            <name>reverb.width</name>
+            <type>num</type>
+            <def>0.5</def>
+            <min>0</min>
+            <max>100</max>
+            <desc>
+                Sets the stereo spread of the reverb signal.</desc>
+        </setting>
+        <setting>
             <name>sample-rate</name>
             <type>num</type>
             <def>44100.0</def>
@@ -247,7 +334,7 @@ https://stackoverflow.com/a/6251757
             <type>bool</type>
             <def>1 (TRUE)</def>
             <desc>
-                Controls whether the synth's public API is protected by a mutex or not. Default is on, turn it off for slightly better performance if you know you're only accessing the synth from one thread only, this could be the case in many embedded use cases for example. Note that libfluidsynth can use many threads by itself (shell is one, midi driver is one, midi player is one etc) so you should usually leave it on. Also see synth.parallel-render.
+                Controls whether the synth's public API is protected by a mutex or not. Default is on, turn it off for slightly better performance if you know you're only accessing the synth from one thread only, this could be the case in many embedded use cases for example. Note that libfluidsynth can use many threads by itself (shell is one, midi driver is one, midi player is one etc) so you should usually leave it on.
             </desc>
         </setting>
         <setting>
@@ -256,15 +343,6 @@ https://stackoverflow.com/a/6251757
             <def>0 (FALSE)</def>
             <desc>
                 When set to 1 (TRUE) the synthesizer will print out information about the received MIDI events to the stdout. This can be helpful for debugging. This setting cannot be changed after the synthesizer has started.
-            </desc>
-        </setting>
-        <setting>
-            <name>volenv</name>
-            <type>str</type>
-            <def>emu</def>
-            <vals>compliant, emu</vals>
-            <desc>
-                Specifies the kind of volume envelope processing. This esp. influences the way fluidsynth responses to noteon velocity. The default setting 'emu' causes the envelope to be highly dynamic (i.e. compatible with the EMU10K1). Alternatively this may be set to 'compliant' for a less dynamic envelope, as it was done before fluidsynth 1.0.9. Note that this setting can only be changed until the first synth has been created. Changing it afterwards will have no effect for the rest of fluidsynths lifetime.
             </desc>
         </setting>
     </synth>

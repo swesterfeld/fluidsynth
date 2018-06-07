@@ -46,6 +46,16 @@
 
 #define FLUID_UNSET_PROGRAM     128     /* Program number used to unset a preset */
 
+#define FLUID_REVERB_DEFAULT_ROOMSIZE 0.2f      /**< Default reverb room size */
+#define FLUID_REVERB_DEFAULT_DAMP 0.0f          /**< Default reverb damping */
+#define FLUID_REVERB_DEFAULT_WIDTH 0.5f         /**< Default reverb width */
+#define FLUID_REVERB_DEFAULT_LEVEL 0.9f         /**< Default reverb level */
+
+#define FLUID_CHORUS_DEFAULT_N 3                                /**< Default chorus voice count */
+#define FLUID_CHORUS_DEFAULT_LEVEL 2.0f                         /**< Default chorus level */
+#define FLUID_CHORUS_DEFAULT_SPEED 0.3f                         /**< Default chorus speed */
+#define FLUID_CHORUS_DEFAULT_DEPTH 8.0f                         /**< Default chorus depth */
+#define FLUID_CHORUS_DEFAULT_TYPE FLUID_CHORUS_MOD_SINE         /**< Default chorus waveform type */
 
 /***************************************************************
  *
@@ -73,17 +83,6 @@ enum fluid_synth_status
 
 #define SYNTH_REVERB_CHANNEL 0
 #define SYNTH_CHORUS_CHANNEL 1
-
-/*
- * Structure used for sfont_info field in #fluid_synth_t for each loaded
- * SoundFont with the SoundFont instance and additional fields.
- */
-typedef struct _fluid_sfont_info_t {
-  fluid_sfont_t *sfont; /**< Loaded SoundFont */
-  fluid_synth_t *synth; /**< Parent synth */
-  int refcount;         /**< SoundFont reference count (0 if no presets referencing it) */
-  int bankofs;          /**< Bank offset */
-} fluid_sfont_info_t;
 
 /*
  * fluid_synth_t
@@ -125,9 +124,8 @@ struct _fluid_synth_t
   fluid_overflow_prio_t overflow;    /**< parameters for overflow priority (aka voice-stealing) */
 
   fluid_list_t *loaders;             /**< the SoundFont loaders */
-  fluid_list_t *sfont_info;          /**< List of fluid_sfont_info_t for each loaded SoundFont (remains until SoundFont is unloaded) */
-  fluid_hashtable_t *sfont_hash;     /**< Hash of fluid_sfont_t->fluid_sfont_info_t (remains until SoundFont is deleted) */
-  unsigned int sfont_id;             /**< Incrementing ID assigned to each loaded SoundFont */
+  fluid_list_t *sfont;          /**< List of fluid_sfont_info_t for each loaded SoundFont (remains until SoundFont is unloaded) */
+  int sfont_id;             /**< Incrementing ID assigned to each loaded SoundFont */
 
   float gain;                        /**< master gain */
   fluid_channel_t** channel;         /**< the channels */
@@ -136,6 +134,7 @@ struct _fluid_synth_t
   int active_voice_count;            /**< count of active voices */
   unsigned int noteid;               /**< the id is incremented for every new note. it's used for noteoff's  */
   unsigned int storeid;
+  int fromkey_portamento;			 /**< fromkey portamento */
   fluid_rvoice_eventhandler_t* eventhandler;
 
   double reverb_roomsize;             /**< Shadow of reverb roomsize */
@@ -166,19 +165,29 @@ struct _fluid_synth_t
   fluid_mod_t* default_mod;          /**< the (dynamic) list of default modulators */
 
   fluid_ladspa_fx_t* ladspa_fx;      /**< Effects unit for LADSPA support */
+  enum fluid_iir_filter_type custom_filter_type; /**< filter type of the user-defined filter currently used for all voices */
+  enum fluid_iir_filter_flags custom_filter_flags; /**< filter type of the user-defined filter currently used for all voices */
 };
 
+/**
+ * Type definition of the synthesizer's audio callback function.
+ * @param synth FluidSynth instance
+ * @param len Count of audio frames to synthesize
+ * @param out1 Array to store left channel of audio to
+ * @param loff Offset index in 'out1' for first sample
+ * @param lincr Increment between samples stored to 'out1'
+ * @param out2 Array to store right channel of audio to
+ * @param roff Offset index in 'out2' for first sample
+ * @param rincr Increment between samples stored to 'out2'
+ */
+typedef int (*fluid_audio_callback_t)(fluid_synth_t* synth, int len, 
+				     void* out1, int loff, int lincr, 
+				     void* out2, int roff, int rincr);
+
 fluid_preset_t* fluid_synth_find_preset(fluid_synth_t* synth,
-				      unsigned int banknum,
-				      unsigned int prognum);
+				      int banknum,
+				      int prognum);
 void fluid_synth_sfont_unref (fluid_synth_t *synth, fluid_sfont_t *sfont);
-				      
-
-int fluid_synth_all_notes_off(fluid_synth_t* synth, int chan);
-int fluid_synth_all_sounds_off(fluid_synth_t* synth, int chan);
-int fluid_synth_kill_voice(fluid_synth_t* synth, fluid_voice_t * voice);
-
-void fluid_synth_print_voice(fluid_synth_t* synth);
 
 void fluid_synth_dither_s16(int *dither_index, int len, float* lin, float* rin,
 			    void* lout, int loff, int lincr,
@@ -196,15 +205,28 @@ int fluid_synth_set_chorus_full(fluid_synth_t* synth, int set, int nr, double le
 fluid_sample_timer_t* new_fluid_sample_timer(fluid_synth_t* synth, fluid_timer_callback_t callback, void* data);
 void delete_fluid_sample_timer(fluid_synth_t* synth, fluid_sample_timer_t* timer);
 
-void fluid_synth_api_enter(fluid_synth_t* synth);
-void fluid_synth_api_exit(fluid_synth_t* synth);
 
 void fluid_synth_process_event_queue(fluid_synth_t* synth);
 
+int fluid_synth_set_gen2 (fluid_synth_t* synth, int chan,
+                                         int param, float value,
+                                         int absolute, int normalized);
 /*
  * misc
  */
-
 void fluid_synth_settings(fluid_settings_t* settings);
 
+
+/* extern declared in fluid_synth_monopoly.c */
+
+int fluid_synth_noteon_mono_staccato(fluid_synth_t* synth,int chan,int key,int vel);
+int fluid_synth_noteon_mono_LOCAL(fluid_synth_t* synth, int chan, int key, int vel);
+int fluid_synth_noteoff_mono_LOCAL(fluid_synth_t* synth, int chan, int key);
+int fluid_synth_noteon_monopoly_legato(fluid_synth_t* synth, int chan, int fromkey, int tokey, int vel);
+int fluid_synth_noteoff_monopoly(fluid_synth_t* synth, int chan, int key, char Mono);
+
+fluid_voice_t*
+fluid_synth_alloc_voice_LOCAL(fluid_synth_t* synth, fluid_sample_t* sample, int chan, int key, int vel, fluid_zone_range_t* zone_range);
+
+void fluid_synth_release_voice_on_same_note_LOCAL(fluid_synth_t* synth, int chan, int key);
 #endif  /* _FLUID_SYNTH_H */

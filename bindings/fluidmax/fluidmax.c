@@ -821,8 +821,8 @@ fluidmax_chorus(t_object *o, Symbol *s, short ac, Atom *at)
   }
   else if(ftmax_is_number(at))
   {
-    double speed = fluid_synth_get_chorus_speed_Hz(self->synth);
-    double depth = fluid_synth_get_chorus_depth_ms(self->synth);
+    double speed = fluid_synth_get_chorus_speed(self->synth);
+    double depth = fluid_synth_get_chorus_depth(self->synth);
     int type = fluid_synth_get_chorus_type(self->synth);
     int nr = fluid_synth_get_chorus_nr(self->synth);
 
@@ -1123,18 +1123,18 @@ fluidmax_print(t_object *o, Symbol *s, short ac, Atom *at)
             
             if(sf != NULL)
             {
-              fluid_preset_t preset;
+              fluid_preset_t *preset;
               
               fluid_sfont_iteration_start(sf);
               
               post("fluidsynth~ presets of soundfont '%s':", ftmax_symbol_name(name));
               
-              while(fluid_sfont_iteration_next(sf, &preset) > 0)
+              while((preset = fluid_sfont_iteration_next(sf)) != NULL)
               {
-                char *preset_str = fluid_preset_get_name(&preset);
+                char *preset_str = fluid_preset_get_name(preset);
                 ftmax_symbol_t preset_name = ftmax_new_symbol(preset_str);
-                int bank_num = fluid_preset_get_banknum(&preset);
-                int prog_num = fluid_preset_get_num(&preset);
+                int bank_num = fluid_preset_get_banknum(preset);
+                int prog_num = fluid_preset_get_num(preset);
                 
                 post("  '%s': bank %d, program %d", ftmax_symbol_name(preset_name), bank_num, prog_num);
               }
@@ -1267,8 +1267,8 @@ fluidmax_print(t_object *o, Symbol *s, short ac, Atom *at)
         if(self->chorus != 0)
         {
           double level = fluid_synth_get_chorus_level(self->synth);
-          double speed = fluid_synth_get_chorus_speed_Hz(self->synth);
-          double depth = fluid_synth_get_chorus_depth_ms(self->synth);
+          double speed = fluid_synth_get_chorus_speed(self->synth);
+          double depth = fluid_synth_get_chorus_depth(self->synth);
           int type = fluid_synth_get_chorus_type(self->synth);
           int nr = fluid_synth_get_chorus_nr(self->synth);
           
@@ -1340,16 +1340,16 @@ fluidmax_info(t_object *o, Symbol *s, short ac, Atom *at)
             
             if(sf != NULL)
             {
-              fluid_preset_t preset;
+              fluid_preset_t *preset;
               
               fluid_sfont_iteration_start(sf);
               
-              while(fluid_sfont_iteration_next(sf, &preset) > 0)
+              while((preset = fluid_sfont_iteration_next(sf)) != NULL)
               {
-                char *preset_str = fluid_preset_get_name(&preset);
+                char *preset_str = fluid_preset_get_name(preset);
                 ftmax_symbol_t preset_name = ftmax_new_symbol(preset_str);
-                int bank_num = fluid_preset_get_banknum(&preset);
-                int prog_num = fluid_preset_get_num(&preset);
+                int bank_num = fluid_preset_get_banknum(preset);
+                int prog_num = fluid_preset_get_num(preset);
                 ftmax_atom_t a[4];
                 
                 ftmax_set_symbol(a , preset_name);
@@ -1477,8 +1477,8 @@ fluidmax_info(t_object *o, Symbol *s, short ac, Atom *at)
         if(self->chorus != 0)
         {
           double level = fluid_synth_get_chorus_level(self->synth);
-          double speed = fluid_synth_get_chorus_speed_Hz(self->synth);
-          double depth = fluid_synth_get_chorus_depth_ms(self->synth);
+          double speed = fluid_synth_get_chorus_speed(self->synth);
+          double depth = fluid_synth_get_chorus_depth(self->synth);
           int type = fluid_synth_get_chorus_type(self->synth);
           int nr = fluid_synth_get_chorus_nr(self->synth);
           ftmax_atom_t a[5];

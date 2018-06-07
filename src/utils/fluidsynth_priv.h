@@ -24,9 +24,7 @@
 
 #include <glib.h>
 
-#if HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #if defined(__POWERPC__) && !(defined(__APPLE__) && defined(__MACH__))
 #include "config_maxmsp43.h"
@@ -104,8 +102,16 @@
 #include <pthread.h>
 #endif
 
+#if HAVE_OPENMP
+#include <omp.h>
+#endif
+
 #if HAVE_IO_H
 #include <io.h>
+#endif
+
+#if HAVE_SIGNAL_H
+#include <signal.h>
 #endif
 
 /** Integer types  */
@@ -201,6 +207,25 @@ typedef struct _fluid_hashtable_t  fluid_hashtable_t;
 typedef struct _fluid_client_t fluid_client_t;
 typedef struct _fluid_server_socket_t fluid_server_socket_t;
 typedef struct _fluid_sample_timer_t fluid_sample_timer_t;
+typedef struct _fluid_zone_range_t fluid_zone_range_t;
+typedef struct _fluid_rvoice_eventhandler_t fluid_rvoice_eventhandler_t;
+
+/* Declare rvoice related typedefs here instead of fluid_rvoice.h, as it's needed
+ * in fluid_lfo.c and fluid_adsr.c as well */
+typedef union _fluid_rvoice_param_t
+{
+    void* ptr;
+    int i;
+    fluid_real_t real;
+} fluid_rvoice_param_t;
+enum { MAX_EVENT_PARAMS = 6 }; /**< Maximum number of #fluid_rvoice_param_t to be passed to an #fluid_rvoice_function_t */
+typedef void (*fluid_rvoice_function_t)(void* obj, const fluid_rvoice_param_t param[MAX_EVENT_PARAMS]);
+
+/* Macro for declaring an rvoice event function (#fluid_rvoice_function_t). The functions may only access
+ * those params that were previously set in fluid_voice.c
+ */
+#define DECLARE_FLUID_RVOICE_FUNCTION(name) void name(void* obj, const fluid_rvoice_param_t param[MAX_EVENT_PARAMS])
+
 
 /***************************************************************
  *
@@ -224,7 +249,8 @@ typedef FILE*  fluid_file;
 #define FLUID_MALLOC(_n)             malloc(_n)
 #define FLUID_REALLOC(_p,_n)         realloc(_p,_n)
 #define FLUID_NEW(_t)                (_t*)malloc(sizeof(_t))
-#define FLUID_ARRAY(_t,_n)           (_t*)malloc((_n)*sizeof(_t))
+#define FLUID_ARRAY_ALIGNED(_t,_n,_a) (_t*)malloc((_n)*sizeof(_t) + ((unsigned int)_a - 1u))
+#define FLUID_ARRAY(_t,_n)           FLUID_ARRAY_ALIGNED(_t,_n,1u)
 #define FLUID_FREE(_p)               free(_p)
 #define FLUID_FOPEN(_f,_m)           fopen(_f,_m)
 #define FLUID_FCLOSE(_f)             fclose(_f)
@@ -256,13 +282,17 @@ do { strncpy(_dst,_src,_n); \
 #define FLUID_FPRINTF                fprintf
 
 #if (defined(WIN32) && _MSC_VER < 1900) || defined(MINGW32)
-    #define FLUID_SNPRINTF           _snprintf
+    /* need to make sure we use a C99 compliant implementation of (v)snprintf(),
+     * i.e. not microsofts non compliant extension _snprintf() as it doesnt
+     * reliably null-terminates the buffer
+     */
+    #define FLUID_SNPRINTF           g_snprintf
 #else
     #define FLUID_SNPRINTF           snprintf
 #endif
 
 #if (defined(WIN32) && _MSC_VER < 1500) || defined(MINGW32)
-    #define FLUID_VSNPRINTF          _vsnprintf
+    #define FLUID_VSNPRINTF          g_vsnprintf
 #else
     #define FLUID_VSNPRINTF          vsnprintf
 #endif
@@ -305,17 +335,15 @@ do { strncpy(_dst,_src,_n); \
 #define M_LN10 2.3025850929940456840179914546844
 #endif
 
-#define FLUID_ASSERT(a,b)
-#define FLUID_ASSERT_P(a,b)
+#ifdef DEBUG
+#define FLUID_ASSERT(a) g_assert(a)
+#else
+#define FLUID_ASSERT(a) 
+#endif
 
 #define FLUID_LIKELY G_LIKELY
 #define FLUID_UNLIKELY G_UNLIKELY
 
 char* fluid_error(void);
-
-
-/* Internationalization */
-#define _(s) s
-
 
 #endif /* _FLUIDSYNTH_PRIV_H */

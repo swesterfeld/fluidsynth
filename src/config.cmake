@@ -76,6 +76,9 @@
 /* Define to 1 if you have the <netinet/tcp.h> header file. */
 #cmakedefine HAVE_NETINET_TCP_H @HAVE_NETINET_TCP_H@
 
+/* Define if compiling with openMP to enable parallel audio rendering */
+#cmakedefine HAVE_OPENMP @HAVE_OPENMP@
+
 /* Define to 1 if you have the <pthread.h> header file. */
 #cmakedefine HAVE_PTHREAD_H @HAVE_PTHREAD_H@
 
@@ -189,6 +192,12 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #cmakedefine STDC_HEADERS @STDC_HEADERS@
+
+/* Soundfont to load for unit testing */
+#cmakedefine TEST_SOUNDFONT "@TEST_SOUNDFONT@"
+
+/* SF3 Soundfont to load for unit testing */
+#cmakedefine TEST_SOUNDFONT_SF3 "@TEST_SOUNDFONT_SF3@"
 
 /* Define to enable SIGFPE assertions */
 #cmakedefine TRAP_ON_FPE @TRAP_ON_FPE@

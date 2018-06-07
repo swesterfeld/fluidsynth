@@ -84,6 +84,25 @@ int fluid_handle_router_chan(void* data, int ac, char** av, fluid_ostream_t out)
 int fluid_handle_router_par1(void* data, int ac, char** av, fluid_ostream_t out);
 int fluid_handle_router_par2(void* data, int ac, char** av, fluid_ostream_t out);
 
+#if WITH_PROFILING
+int fluid_handle_profile(void *data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_prof_set_notes(void *data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_prof_set_print(void *data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_prof_start(void *data, int ac, char** av, fluid_ostream_t out);
+#endif
+
+int fluid_handle_basicchannels (void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_resetbasicchannels (void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_setbasicchannels (void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_channelsmode (void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_legatomode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_setlegatomode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_portamentomode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_setportamentomode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_breathmode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_setbreathmode(void* data, int ac, char** av, fluid_ostream_t out);
+int fluid_handle_sleep(void *data, int ac, char** av, fluid_ostream_t out);
+
 #ifdef LADSPA
 int fluid_handle_ladspa_effect(void *data, int ac, char **av, fluid_ostream_t out);
 int fluid_handle_ladspa_link(void *data, int ac, char **av, fluid_ostream_t out);
@@ -95,13 +114,36 @@ int fluid_handle_ladspa_stop(void *data, int ac, char **av, fluid_ostream_t out)
 int fluid_handle_ladspa_reset(void *data, int ac, char **av, fluid_ostream_t out);
 #endif
 
-fluid_cmd_t* fluid_cmd_copy(fluid_cmd_t* cmd);
+
+/**
+ * Command handler function prototype.
+ * @param data User defined data
+ * @param ac Argument count
+ * @param av Array of string arguments
+ * @param out Output stream to send response to
+ * @return Should return #FLUID_OK on success, #FLUID_FAILED otherwise
+ */
+typedef int (*fluid_cmd_func_t)(void* data, int ac, char** av, fluid_ostream_t out);
+
+/**
+ * Shell command information structure.
+ */
+typedef struct {
+  char* name;                           /**< The name of the command, as typed in the shell */
+  char* topic;                          /**< The help topic group of this command */
+  fluid_cmd_func_t handler;             /**< Pointer to the handler for this command */
+  char* help;                           /**< A help string */
+} fluid_cmd_t;
+
+fluid_cmd_t* fluid_cmd_copy(const fluid_cmd_t* cmd);
 void delete_fluid_cmd(fluid_cmd_t* cmd);
 
 int fluid_cmd_handler_handle(void* data,
 			    int ac, char** av,
 			    fluid_ostream_t out);
 
+int fluid_cmd_handler_register(fluid_cmd_handler_t* handler, const fluid_cmd_t* cmd);
+int fluid_cmd_handler_unregister(fluid_cmd_handler_t* handler, const char *cmd);
 
 
 void fluid_server_remove_client(fluid_server_t* server, fluid_client_t* client);

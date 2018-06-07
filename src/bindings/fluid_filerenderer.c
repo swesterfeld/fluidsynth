@@ -110,8 +110,7 @@ fluid_file_renderer_settings (fluid_settings_t* settings)
   int i, i2;
   unsigned int n;
 
-  fluid_settings_register_str(settings, "audio.file.name", "fluidsynth.wav",
-                              FLUID_HINT_FILENAME);
+  fluid_settings_register_str(settings, "audio.file.name", "fluidsynth.wav", 0);
   fluid_settings_register_str(settings, "audio.file.type", "auto", 0);
   fluid_settings_register_str(settings, "audio.file.format", "s16", 0);
   fluid_settings_register_str(settings, "audio.file.endian", "auto", 0);
@@ -284,6 +283,7 @@ new_fluid_file_renderer(fluid_synth_t* synth)
 /**
  * Set vbr encoding quality (only available with libsndfile support)
  * @param dev File renderer object.
+ * @param q The encoding quality, see libsndfile documentation of \c SFC_SET_VBR_ENCODING_QUALITY
  * @return #FLUID_OK if the quality has been successfully set, #FLUID_FAILED otherwise
  * @since 1.1.7
  */
@@ -348,19 +348,17 @@ fluid_file_renderer_process_block(fluid_file_renderer_t* dev)
 
 #else   /* No libsndfile support */
 
-	int n, offset;
+	size_t res, nmemb = dev->buf_size;
 
 	fluid_synth_write_s16(dev->synth, dev->period_size, dev->buf, 0, 2, dev->buf, 1, 2);
 
-	for (offset = 0; offset < dev->buf_size; offset += n) {
-
-		n = fwrite((char*) dev->buf + offset, 1, dev->buf_size - offset, dev->file);
-		if (n < 0) {
+		res = fwrite(dev->buf, 1, nmemb, dev->file);
+		if (res < nmemb) {
 			FLUID_LOG(FLUID_ERR, "Audio output file write error: %s",
 				  strerror (errno));
 			return FLUID_FAILED;
 		}
-	}
+
 	return FLUID_OK;
 #endif
 }

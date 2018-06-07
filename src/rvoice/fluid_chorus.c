@@ -220,11 +220,7 @@ fluid_chorus_init(fluid_chorus_t* chorus)
   for (i = 0; i < MAX_SAMPLES; i++) {
     chorus->chorusbuf[i] = 0.0;
   }
-
-  /* initialize the chorus with the default settings */
-  fluid_chorus_set (chorus, FLUID_CHORUS_SET_ALL, FLUID_CHORUS_DEFAULT_N,
-                    FLUID_CHORUS_DEFAULT_LEVEL, FLUID_CHORUS_DEFAULT_SPEED,
-                    FLUID_CHORUS_DEFAULT_DEPTH, FLUID_CHORUS_MOD_SINE);
+  
   return FLUID_OK;
 }
 
@@ -247,8 +243,8 @@ fluid_chorus_reset(fluid_chorus_t* chorus)
  * @param type Chorus waveform type (#fluid_chorus_mod)
  */
 void
-fluid_chorus_set(fluid_chorus_t* chorus, int set, int nr, float level,
-                 float speed, float depth_ms, int type)
+fluid_chorus_set(fluid_chorus_t* chorus, int set, int nr, fluid_real_t level,
+                 fluid_real_t speed, fluid_real_t depth_ms, int type)
 {
   int modulation_depth_samples;
   int i;
@@ -479,13 +475,22 @@ static void
 fluid_chorus_sine(int *buf, int len, int depth)
 {
   int i;
-  double val;
+  double angle, incr, mult;
 
+  /* Pre-calculate increment between angles. */
+  incr = (2. * M_PI) / (double)len;
+
+  /* Pre-calculate 'depth' multiplier. */
+  mult = (double) depth / 2.0 * (double) INTERPOLATION_SUBSAMPLES;
+
+  /* Initialize to zero degrees. */
+  angle = 0.;
+
+  /* Build sine modulation waveform */
   for (i = 0; i < len; i++) {
-    val = sin((double) i / (double)len * 2.0 * M_PI);
-    buf[i] = (int) ((1.0 + val) * (double) depth / 2.0 * (double) INTERPOLATION_SUBSAMPLES);
-    buf[i] -= 3* MAX_SAMPLES * INTERPOLATION_SUBSAMPLES;
-    //    printf("%i %i\n",i,buf[i]);
+    buf[i] = (int) ((1. + sin(angle)) * mult) - 3 * MAX_SAMPLES * INTERPOLATION_SUBSAMPLES;
+
+    angle += incr;
   }
 }
 
@@ -496,15 +501,25 @@ fluid_chorus_sine(int *buf, int len, int depth)
 static void
 fluid_chorus_triangle(int *buf, int len, int depth)
 {
-  int i=0;
-  int ii=len-1;
-  double val;
-  double val2;
+  int *il = buf;
+  int *ir = buf + len-1;
+  int ival;
+  double val, incr;
 
-  while (i <= ii){
-    val = i * 2.0 / len * (double)depth * (double) INTERPOLATION_SUBSAMPLES;
-    val2= (int) (val + 0.5) - 3 * MAX_SAMPLES * INTERPOLATION_SUBSAMPLES;
-    buf[i++] = (int) val2;
-    buf[ii--] = (int) val2;
+  /* Pre-calculate increment for the ramp. */
+  incr = 2.0 / len * (double)depth * (double) INTERPOLATION_SUBSAMPLES;
+
+  /* Initialize first value */
+  val = 0. - 3. * MAX_SAMPLES * INTERPOLATION_SUBSAMPLES;
+
+  /* Build triangular modulation waveform */
+  while (il <= ir) {
+    /* Assume 'val' to be always negative for rounding mode */
+    ival = (int)(val - 0.5);
+
+    *il++ = ival;
+    *ir-- = ival;
+
+    val += incr;
   }
 }

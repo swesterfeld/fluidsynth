@@ -19,10 +19,9 @@
 
 # CMake based build system. Pedro Lopez-Cabanillas <plcl@users.sf.net>
 
-cmake_minimum_required ( VERSION 3.0.2 )
+cmake_minimum_required ( VERSION 3.1.0 ) # because of CMAKE_C_STANDARD
 project ( FluidSynth C )
 set ( CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_admin )
-set ( CMAKE_EXPORT_COMPILE_COMMANDS 1 )
 
 # FluidSynth package name
 set ( PACKAGE "fluidsynth" )
@@ -50,30 +49,31 @@ set ( LIB_VERSION_INFO
       "${LIB_VERSION_CURRENT}.${LIB_VERSION_AGE}.${LIB_VERSION_REVISION}" )
 
 # Options disabled by default
-option ( enable-floats "enable type float instead of double for DSP samples" off )
-option ( enable-profiling "profile the dsp code" off )
-option ( enable-portaudio "compile PortAudio support" off )
-option ( enable-trap-on-fpe "enable SIGFPE trap on Floating Point Exceptions" off )
-option ( enable-fpe-check "enable Floating Point Exception checks and debug messages" off )
 option ( enable-debug "enable debugging (default=no)" off )
+option ( enable-floats "enable type float instead of double for DSP samples" off )
+option ( enable-fpe-check "enable Floating Point Exception checks and debug messages" off )
+option ( enable-portaudio "compile PortAudio support" off )
+option ( enable-profiling "profile the dsp code" off )
+option ( enable-trap-on-fpe "enable SIGFPE trap on Floating Point Exceptions" off )
+option ( enable-tests "build unit tests (implicitly disables BUILD_SHARED_LIBS)" off )
 
 # Options enabled by default
-option ( enable-pkgconfig "use pkg-config to locate fluidsynth's (mostly optional) dependencies" on )
-option ( enable-libsndfile "compile libsndfile support (if it is available)" on )
 option ( enable-aufile "compile support for sound file output" on )
-option ( enable-pulseaudio "compile PulseAudio support (if it is available)" on )
-option ( enable-jack "compile JACK support (if it is available)" on )
-option ( enable-midishare "compile MidiShare support (if it is available)" on )
-option ( enable-readline "compile readline lib line editing (if it is available)" on )
-option ( enable-dbus "compile DBUS support (if it is available)" on )
 option ( BUILD_SHARED_LIBS "Build a shared object or DLL" on )
+option ( enable-dbus "compile DBUS support (if it is available)" on )
+option ( enable-ipv6  "enable ipv6 support" on )
+option ( enable-jack "compile JACK support (if it is available)" on )
 option ( enable-ladspa "enable LADSPA effect units" on )
-option ( enable-ipv6  "enable ipv6 support " on )
-option ( enable-network "enable network support (requires BSD sockets) " on )
+option ( enable-libsndfile "compile libsndfile support (if it is available)" on )
+option ( enable-midishare "compile MidiShare support (if it is available)" on )
+option ( enable-network "enable network support (requires BSD sockets)" on )
+option ( enable-oss "compile OSS support (if it is available)" on )
+option ( enable-pkgconfig "use pkg-config to locate fluidsynth's (mostly optional) dependencies" on )
+option ( enable-pulseaudio "compile PulseAudio support (if it is available)" on )
+option ( enable-readline "compile readline lib line editing (if it is available)" on )
 
 # Platform specific options
 if ( CMAKE_SYSTEM MATCHES "Linux" )
-    option ( enable-ladcca "compile LADCCA support if it is available (deprecated)" off )
     option ( enable-lash "compile LASH support (if it is available)" on )
     option ( enable-alsa "compile ALSA support (if it is available)" on )
 endif ( CMAKE_SYSTEM MATCHES "Linux" )
@@ -91,7 +91,7 @@ if ( CMAKE_SYSTEM MATCHES "OS2" )
 endif ( CMAKE_SYSTEM MATCHES "OS2" )
 
 # Initialize the library directory name suffix.
-if (NOT MINGW)
+if (NOT MINGW AND NOT MSVC)
 if ( CMAKE_SIZEOF_VOID_P EQUAL 8 )
   set ( _init_lib_suffix "64" )
 else ( CMAKE_SIZEOF_VOID_P EQUAL 8 )
@@ -103,6 +103,18 @@ endif()
 set ( LIB_SUFFIX ${_init_lib_suffix} CACHE STRING
       "library directory name suffix (32/64/nothing)" )
 mark_as_advanced ( LIB_SUFFIX )
+
+# the default C standard to use for all targets
+set(CMAKE_C_STANDARD 90)
+
+# the default global visibility level for all target
+# no visibility support on OS2
+if ( NOT OS2 )
+    set ( CMAKE_C_VISIBILITY_PRESET hidden )
+endif ( NOT OS2 )
+# enforce visibility control for all types of cmake targets
+cmake_policy ( SET CMP0063 NEW )
+
 
 # Default install directory names
 include ( DefaultDirs )
@@ -145,7 +157,7 @@ unset ( FLUID_CPPFLAGS CACHE )
 unset ( FLUID_LIBS CACHE )
 
 # Options for the GNU C compiler only
-if ( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
+if ( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "Intel" )
   if ( NOT APPLE AND NOT OS2 )
     set ( CMAKE_EXE_LINKER_FLAGS
           "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed" )
@@ -153,17 +165,21 @@ if ( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
           "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined" )
   endif ( NOT APPLE AND NOT OS2 )
   
-  if ( OS2 )
-    set ( GNUCC_VISIBILITY_FLAG "" )
-  else ( OS2 )
-    set ( GNUCC_VISIBILITY_FLAG "-fvisibility=hidden" )
-  endif ( OS2 )
+  # define some warning flags
+  set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -W -Wpointer-arith -Wno-cast-qual -Wstrict-prototypes -Wno-unused-parameter -Wdeclaration-after-statement" )
+  
+  if ( CMAKE_C_COMPILER_ID STREQUAL "Intel" )
+    # icc needs the restrict flag to recognize C99 restrict pointers
+    set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -restrict" )
+  else () # not intel
+    # gcc and clang support bad function cast and alignment warnings; add them as well.
+    set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wbad-function-cast -Wcast-align" )
+  endif (CMAKE_C_COMPILER_ID STREQUAL "Intel" )
 
-  set ( GNUCC_WARNING_FLAGS "-Wall -W -Wpointer-arith -Wbad-function-cast -Wno-cast-qual -Wcast-align -Wstrict-prototypes -Wno-unused-parameter -Wdeclaration-after-statement" )
-  set ( CMAKE_C_FLAGS_DEBUG "-std=gnu89 -g ${GNUCC_VISIBILITY_FLAG} -DDEBUG ${GNUCC_WARNING_FLAGS} -fsanitize=undefined ${CMAKE_C_FLAGS_DEBUG}" )
-  set ( CMAKE_C_FLAGS_RELEASE "-std=gnu89 -O2 -fomit-frame-pointer -finline-functions ${GNUCC_VISIBILITY_FLAG} -DNDEBUG ${GNUCC_WARNING_FLAGS} ${CMAKE_C_FLAGS_RELEASE}" )
-  set ( CMAKE_C_FLAGS_RELWITHDEBINFO "-std=gnu89 -O2 -g -fomit-frame-pointer -finline-functions ${GNUCC_VISIBILITY_FLAG} -DNDEBUG ${GNUCC_WARNING_FLAGS} ${CMAKE_C_FLAGS_RELWITHDEBINFO}" )
-endif ( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
+  # prepend to build type specific flags, to allow users to override
+  set ( CMAKE_C_FLAGS_DEBUG "-g -DDEBUG -fsanitize=undefined ${CMAKE_C_FLAGS_DEBUG}" )
+  
+endif ( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "Intel" )
 
 # Windows
 unset ( WINDOWS_SUPPORT CACHE )
@@ -179,7 +195,9 @@ if ( WIN32 )
   set ( WINDOWS_LIBS "dsound;winmm;ws2_32" )
   set ( LIBFLUID_CPPFLAGS "-DFLUIDSYNTH_DLL_EXPORTS" )
   set ( FLUID_CPPFLAGS "-DFLUIDSYNTH_NOT_A_DLL" )
-  set ( CMAKE_DEBUG_POSTFIX "_debug" )
+  if (NOT MSVC)
+    set ( CMAKE_DEBUG_POSTFIX "_debug" )
+  endif()
   # MinGW compiler (a Windows GCC port)
   if ( MINGW )
     set ( MINGW32 1 )
@@ -222,7 +240,7 @@ unset ( MACOSX_FRAMEWORK CACHE )
 if ( CMAKE_SYSTEM MATCHES "Darwin" )
   set ( DARWIN 1 )
   set ( CMAKE_INSTALL_NAME_DIR
-        ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR}${LIB_SUFFIX} )
+        ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} )
   if ( enable-coreaudio )
     check_include_file ( CoreAudio/AudioHardware.h COREAUDIO_FOUND )
     if ( COREAUDIO_FOUND )
@@ -265,6 +283,15 @@ endif ( enable-floats )
 unset ( WITH_PROFILING CACHE )
 if ( enable-profiling )
     set ( WITH_PROFILING 1 )
+    if ( CMAKE_C_COMPILER_ID STREQUAL "Clang" )
+      set ( OPT_FLAGS "-Rpass=loop-vectorize -Rpass-analysis=loop-vectorize" )
+    elseif ( CMAKE_C_COMPILER_ID STREQUAL "Intel" )
+      set ( OPT_FLAGS "-qopt-report=3" )
+    elseif ( CMAKE_C_COMPILER_ID STREQUAL "GNU" )
+      set ( OPT_FLAGS "" )
+    endif ( )
+    
+    set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OPT_FLAGS}" )
 endif ( enable-profiling )
 
 unset ( ENABLE_TRAPONFPE CACHE )
@@ -283,12 +310,12 @@ endif ( enable-fpe-check )
 
 if ( enable-debug )
     set ( CMAKE_BUILD_TYPE "Debug" CACHE STRING
-          "Choose the build type, options: Debug Release RelWithDebInfo" FORCE )
+          "Choose the build type, options: Debug Release RelWithDebInfo MinSizeRel" FORCE )
 endif ( enable-debug )
 
 if ( NOT CMAKE_BUILD_TYPE )
     set ( CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
-          "Choose the build type, options: Debug Release RelWithDebInfo" FORCE )
+          "Choose the build type, options: Debug Release RelWithDebInfo MinSizeRel" FORCE )
 endif ( NOT CMAKE_BUILD_TYPE )
 
 unset ( ENABLE_DEBUG CACHE )
@@ -297,6 +324,48 @@ if ( CMAKE_BUILD_TYPE MATCHES "Debug" )
     set ( ENABLE_DEBUG 1 )
     set ( DEBUG 1 )
 endif ( CMAKE_BUILD_TYPE MATCHES "Debug" )
+
+if ( CMAKE_VERSION VERSION_GREATER "3.6.0" )
+find_program( CLANG_TIDY
+            NAMES "clang-tidy"
+            DOC "Path to clang-tidy executable" )
+
+    if ( CLANG_TIDY )
+    message ( STATUS "Found clang-tidy" )
+        # whenever clang-tidy is available, use it to automatically add braces after ever "make"
+        if ( WITH_PROFILING )
+#             set ( CMAKE_C_CLANG_TIDY "clang-tidy" )
+        else ( WITH_PROFILING )
+#             set ( CMAKE_C_CLANG_TIDY "clang-tidy;-checks=-*,readability-braces-around-statements;-format-style=file" )
+        endif ( WITH_PROFILING )
+    endif ( CLANG_TIDY )
+endif ( CMAKE_VERSION VERSION_GREATER "3.6.0" )
+
+# Additional targets to perform clang-format/clang-tidy
+# Get all project files
+file(GLOB_RECURSE
+     ALL_SOURCE_FILES
+     LIST_DIRECTORIES false
+     ${CMAKE_SOURCE_DIR}/*.[chi]
+     ${CMAKE_SOURCE_DIR}/*.[chi]pp
+     ${CMAKE_SOURCE_DIR}/*.[chi]xx
+     ${CMAKE_SOURCE_DIR}/*.cc
+     ${CMAKE_SOURCE_DIR}/*.hh
+     ${CMAKE_SOURCE_DIR}/*.ii
+     ${CMAKE_SOURCE_DIR}/*.[CHI]
+     )
+
+# Adding clang-format target if executable is found
+find_program ( CLANG_FORMAT "clang-format" )
+if ( CLANG_FORMAT )
+  add_custom_target(
+    format
+    COMMAND ${CLANG_FORMAT}
+    -i
+    -style=file
+    ${ALL_SOURCE_FILES}
+    )
+endif(CLANG_FORMAT)
 
 
 if(NOT enable-pkgconfig)
@@ -411,16 +480,24 @@ if ( enable-aufile )
   set ( AUFILE_SUPPORT 1 )
 endif ( enable-aufile )
 
-find_package ( OSS QUIET )
-set ( OSS_SUPPORT ${OSS_FOUND} )
+unset ( OSS_SUPPORT CACHE )
+if ( enable-oss )
+  find_package ( OSS QUIET )
+  set ( OSS_SUPPORT ${OSS_FOUND} )
+endif ( enable-oss )
 
 unset ( MIDISHARE_SUPPORT CACHE )
-if ( enable_midishare )
-  find_package ( MidiShare )
+if ( enable-midishare )
+  find_package ( MidiShare QUIET )
   set ( MIDISHARE_SUPPORT ${MidiShare_FOUND} )
-else ( enable_midishare )
+  if ( MidiShare_FOUND )
+    set ( MidiShare_LIBS ${MidiShare_LIBRARIES} )
+  else ( MidiShare_FOUND )
+    unset ( MidiShare_LIBS CACHE )
+  endif ( MidiShare_FOUND )
+else ( enable-midishare )
   unset ( MidiShare_LIBS CACHE )
-endif ( enable_midishare )
+endif ( enable-midishare )
 
 unset ( WITH_READLINE CACHE )
 if ( enable-readline )
@@ -434,32 +511,77 @@ else ( enable-readline )
   unset ( READLINE_LIBS CACHE )
 endif ( enable-readline )
 
+unset ( HAVE_OPENMP CACHE )
+find_package ( OpenMP QUIET )
+if ( OpenMP_FOUND OR OpenMP_C_FOUND )
+    message(STATUS "Found OpenMP ${OpenMP_C_SPEC_DATE}")
+    # require at least OMP 4.0
+    if ( ( NOT OpenMP_C_SPEC_DATE LESS "201307" ) OR NOT ( OpenMP_C_VERSION VERSION_LESS "4.0" ) )
+        set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}" )
+        set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}" )
+        
+        # currently no need to link against openMP runtime lib(s). If need be, uncomment below.
+        #  set ( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}" )
+        #  set ( LIBFLUID_LIBS "${OpenMP_C_LIBRARIES};${LIBFLUID_LIBS}" )
+        set ( HAVE_OPENMP 1 )
+    endif()
+endif()
+
+
+if(enable-tests)
+    # manipulate some variables to setup a proper test env
+    set(TEST_SOUNDFONT "${CMAKE_SOURCE_DIR}/sf2/VintageDreamsWaves-v2.sf2")
+    set(TEST_SOUNDFONT_SF3 "${CMAKE_SOURCE_DIR}/sf2/VintageDreamsWaves-v2.sf3")
+    
+    # force to build a static lib, in order to bypass the visibility control, allowing us
+    # to test fluidsynths private/internal functions
+    set(BUILD_SHARED_LIBS OFF)
+    
+    add_subdirectory ( test )
+endif(enable-tests)
+
 
 # General configuration file
 configure_file ( ${CMAKE_SOURCE_DIR}/src/config.cmake
                  ${CMAKE_BINARY_DIR}/config.h )
-add_definitions ( -DHAVE_CONFIG_H )
+
 
 # Process subdirectories
 add_subdirectory ( src )
-add_subdirectory ( include )
 add_subdirectory ( doc )
 
 # pkg-config support
 set ( prefix "${CMAKE_INSTALL_PREFIX}" )
 set ( exec_prefix "\${prefix}" )
-set ( libdir "\${exec_prefix}/${LIB_INSTALL_DIR}${LIB_SUFFIX}" )
-set ( includedir "\${prefix}/${INCLUDE_INSTALL_DIR}" )
+if ( IS_ABSOLUTE "${LIB_INSTALL_DIR}" )
+  set ( libdir "${LIB_INSTALL_DIR}" )
+else ()
+  set ( libdir "\${exec_prefix}/${LIB_INSTALL_DIR}" )
+endif ()
+if ( IS_ABSOLUTE "${INCLUDE_INSTALL_DIR}" )
+  set ( includedir "${INCLUDE_INSTALL_DIR}" )
+else ()
+  set ( includedir "\${prefix}/${INCLUDE_INSTALL_DIR}" )
+endif ()
 configure_file ( fluidsynth.pc.in
 	${CMAKE_BINARY_DIR}/fluidsynth.pc IMMEDIATE @ONLY )
 install ( FILES ${CMAKE_BINARY_DIR}/fluidsynth.pc
-	DESTINATION ${LIB_INSTALL_DIR}${LIB_SUFFIX}/pkgconfig )
+	DESTINATION ${LIB_INSTALL_DIR}/pkgconfig )
 
 # Extra targets for Unix build environments
 if ( UNIX )
     # RPM spec
     configure_file ( fluidsynth.spec.in
         ${CMAKE_BINARY_DIR}/fluidsynth.spec IMMEDIATE @ONLY )
+
+    if ( DEFINED FLUID_DAEMON_ENV_FILE)
+        configure_file ( fluidsynth.service.in
+        ${CMAKE_BINARY_DIR}/fluidsynth.service @ONLY )
+
+        configure_file ( fluidsynth.conf.in
+        ${CMAKE_BINARY_DIR}/fluidsynth.conf @ONLY )
+
+    endif ( DEFINED FLUID_DAEMON_ENV_FILE )
 
     # uninstall custom target
     configure_file ( "${CMAKE_SOURCE_DIR}/cmake_admin/cmake_uninstall.cmake.in"

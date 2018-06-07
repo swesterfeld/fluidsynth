@@ -29,10 +29,10 @@
 #include "fluid_adsr_env.h"
 #include "fluid_lfo.h"
 #include "fluid_rvoice.h"
+#include "fluid_rvoice_event.h"
 #include "fluid_sys.h"
 
 #define NO_CHANNEL             0xff
-
 
 typedef struct _fluid_overflow_prio_t fluid_overflow_prio_t;
 
@@ -70,16 +70,17 @@ struct _fluid_voice_t
 	unsigned char key;              /* the key of the noteon event, quick access for noteoff */
 	unsigned char vel;              /* the velocity of the noteon event */
 	fluid_channel_t* channel;
-	fluid_gen_t gen[GEN_LAST];
-	fluid_mod_t mod[FLUID_NUM_MOD];
-	int mod_count;
+	fluid_rvoice_eventhandler_t* eventhandler;
+	fluid_zone_range_t * zone_range; /* instrument zone range*/
 	fluid_sample_t* sample;         /* Pointer to sample (dupe in rvoice) */
+    
+	unsigned int start_time;
+	int mod_count;
+	fluid_mod_t mod[FLUID_NUM_MOD];
+	fluid_gen_t gen[GEN_LAST];
 
 	/* basic parameters */
 	fluid_real_t output_rate;        /* the sample rate of the synthesizer (dupe in rvoice) */
-
-	unsigned int start_time;
-	fluid_adsr_env_t volenv;         /* Volume envelope (dupe in rvoice) */
 
 	/* basic parameters */
 	fluid_real_t pitch;              /* the pitch in midicents (dupe in rvoice) */
@@ -91,6 +92,9 @@ struct _fluid_voice_t
 
 	/* pan */
 	fluid_real_t pan;
+
+    /* balance */
+    fluid_real_t balance;
 
 	/* reverb */
 	fluid_real_t reverb_send;
@@ -112,15 +116,14 @@ struct _fluid_voice_t
 };
 
 
-fluid_voice_t* new_fluid_voice(fluid_real_t output_rate);
+fluid_voice_t* new_fluid_voice(fluid_rvoice_eventhandler_t* handler, fluid_real_t output_rate);
 void delete_fluid_voice(fluid_voice_t* voice);
 
 void fluid_voice_start(fluid_voice_t* voice);
 void  fluid_voice_calculate_gen_pitch(fluid_voice_t* voice);
 
-int fluid_voice_write (fluid_voice_t* voice, fluid_real_t *dsp_buf);
-
-int fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
+int fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample, 
+		     fluid_zone_range_t *inst_zone_range,
 		     fluid_channel_t* channel, int key, int vel,
 		     unsigned int id, unsigned int time, fluid_real_t gain);
 
@@ -134,7 +137,7 @@ int fluid_voice_set_param(fluid_voice_t* voice, int gen, fluid_real_t value, int
 /** Set the gain. */
 int fluid_voice_set_gain(fluid_voice_t* voice, fluid_real_t gain);
 
-int fluid_voice_set_output_rate(fluid_voice_t* voice, fluid_real_t value);
+void fluid_voice_set_output_rate(fluid_voice_t* voice, fluid_real_t value);
 
 
 /** Update all the synthesis parameters, which depend on generator
@@ -143,8 +146,15 @@ int fluid_voice_set_output_rate(fluid_voice_t* voice, fluid_real_t value);
     function.*/
 void fluid_voice_update_param(fluid_voice_t* voice, int gen);
 
+/** legato modes */
+/* force in the attack section for legato mode multi_retrigger: 1 */
+void fluid_voice_update_multi_retrigger_attack(fluid_voice_t* voice,int tokey, int vel);
+/* Update portamento parameter */
+void fluid_voice_update_portamento (fluid_voice_t* voice, int fromkey, int tokey);
+
+
 void fluid_voice_release(fluid_voice_t* voice);
-int fluid_voice_noteoff(fluid_voice_t* voice);
+void fluid_voice_noteoff(fluid_voice_t* voice);
 void fluid_voice_off(fluid_voice_t* voice);
 void fluid_voice_stop(fluid_voice_t* voice);
 void fluid_voice_overflow_rvoice_finished(fluid_voice_t* voice);
@@ -159,11 +169,10 @@ float fluid_voice_get_overflow_prio(fluid_voice_t* voice,
 /**
  * Locks the rvoice for rendering, so it can't be modified directly
  */
-static FLUID_INLINE fluid_rvoice_t* 
+static FLUID_INLINE void 
 fluid_voice_lock_rvoice(fluid_voice_t* voice)
 {
   voice->can_access_rvoice = 0;
-  return voice->rvoice;
 }
 
 /**
@@ -182,8 +191,7 @@ fluid_voice_unlock_rvoice(fluid_voice_t* voice)
 
 
 fluid_real_t fluid_voice_gen_value(const fluid_voice_t* voice, int num);
-
-#define fluid_voice_get_loudness(voice) (fluid_adsr_env_get_max_val(&voice->volenv))
+void fluid_voice_set_custom_filter(fluid_voice_t* voice, enum fluid_iir_filter_type type, enum fluid_iir_filter_flags flags);
 
 
 #endif /* _FLUID_VOICE_H */

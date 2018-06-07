@@ -26,6 +26,12 @@
 #include "fluid_list.h"
 #include "fluid_event_priv.h"
 
+typedef struct _fluid_midi_parser_t fluid_midi_parser_t;
+
+fluid_midi_parser_t* new_fluid_midi_parser(void);
+void delete_fluid_midi_parser(fluid_midi_parser_t* parser);
+fluid_midi_event_t* fluid_midi_parser_parse(fluid_midi_parser_t* parser, unsigned char c);
+
 
 /***************************************************************
  *
@@ -101,7 +107,7 @@ enum fluid_midi_control_change {
   PORTAMENTO_SWITCH = 0x41,
   SOSTENUTO_SWITCH = 0x42,
   SOFT_PEDAL_SWITCH = 0x43,
-  LEGATO_SWITCH = 0x45,
+  LEGATO_SWITCH = 0x44,
   HOLD2_SWITCH = 0x45,
   SOUND_CTRL1 = 0x46,
   SOUND_CTRL2 = 0x47,

@@ -9,7 +9,7 @@ Contributing can be done by
 https://help.github.com/articles/proposing-changes-to-your-work-with-pull-requests/) or
 * submitting patches to the mailing list.
 
-Patches should be created with `git format-patch`, so in every case you should be familiar with the basics of git.
+Patches should be created with `git format-patch`, so in every case you should be familiar with the basics of git. Make sure you develop against the master branch, i.e. **not** against any FluidSynth release.
 
 Some things that will increase the chance that your pull request or patch is accepted:
 
@@ -20,7 +20,7 @@ Some things that will increase the chance that your pull request or patch is acc
 
 ## Style Guide
 
-Find FluidSynth's style guide below. Most of the syntax issues can be automatically applied with `clang-format` and `clang-tidy` using the config files in the repository root.
+Find FluidSynth's style guide below. Syntax related issues, like missing braces, will be automatically taken care of when compiling fluidsynth by calling `make` (provided that cmake has found `clang-tidy >= 5.0` on your system). An explicit reformatting can be achieved using `make format` (provided that cmake has found `clang-format` on your system).
 
 #### General
 * Every function should have a short comment explaining it's purpose
