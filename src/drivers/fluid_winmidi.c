@@ -319,14 +319,14 @@ fluid_winmidi_callback(HMIDIIN hmi, UINT wMsg, DWORD_PTR dwInstance,
     event = fluid_midi_parser_parse(dev->parser, msg_p1(msg_param));
     if (event != NULL)
     {
-        (*dev->driver.handler)(dev->driver.data, &event);
+        (*dev->driver.handler)(dev->driver.data, event);
         break;
     }
     
     event = fluid_midi_parser_parse(dev->parser, msg_p2(msg_param));
     if (event != NULL)
     {
-        (*dev->driver.handler)(dev->driver.data, &event);
+        (*dev->driver.handler)(dev->driver.data, event);
         break;
     }
     
@@ -344,9 +344,9 @@ fluid_winmidi_callback(HMIDIIN hmi, UINT wMsg, DWORD_PTR dwInstance,
     if (pMidiHdr->dwBytesRecorded > 2 && data[0] == 0xF0
         && data[pMidiHdr->dwBytesRecorded - 1] == 0xF7)
     {
-      fluid_event_set_sysex (&event, pMidiHdr->lpData + 1,
+      fluid_event_set_sysex (event, pMidiHdr->lpData + 1,
                                   pMidiHdr->dwBytesRecorded - 2, FALSE);
-      (*dev->driver.handler)(dev->driver.data, &event);
+      (*dev->driver.handler)(dev->driver.data, event);
     }
 
     PostThreadMessage(dev->dwThread, MM_MIM_LONGDATA, 0, dwParam1);
