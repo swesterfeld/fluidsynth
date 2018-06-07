@@ -563,7 +563,7 @@ fluid_jack_driver_process (jack_nframes_t nframes, void *arg)
                 /* send the event to the next link in the chain */
                 if (evt != NULL)
                 {
-                    fluid_midi_event_set_channel(evt, fluid_midi_event_get_channel(evt) + i * 16);
+                    fluid_event_set_channel(evt, fluid_event_get_channel(evt) + i * 16);
                     midi_driver->driver.handler (midi_driver->driver.data, evt);
                 }
             }

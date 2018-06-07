@@ -132,6 +132,11 @@ fluid_event_set_dest(fluid_event_t* evt, fluid_seq_id_t dest)
 	evt->dest = dest;
 }
 
+void fluid_event_set_channel(fluid_event_t* evt, int chan)
+{
+    evt->channel = chan;
+}
+
 /**
  * Set a sequencer event to be a timer event.
  * @param evt Sequencer event structure
