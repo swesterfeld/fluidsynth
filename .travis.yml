@@ -46,6 +46,10 @@ matrix:
 
     - os: linux
       env:
+        - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9 && sudo apt-get install gcc-9"
+
+    - os: linux
+      env:
         - MATRIX_EVAL="CC=clang-3.8 && CXX=clang++-3.8 && sudo apt-get install clang-3.8"
 
     - os: linux
@@ -55,6 +59,10 @@ matrix:
     - os: linux
       env:
         - MATRIX_EVAL="CC=clang-7 && CXX=clang++-7 && sudo apt-get install clang-7"
+
+    - os: linux
+      env:
+        - MATRIX_EVAL="CC=clang-8 && CXX=clang++-8 && sudo apt-get install clang-8"
 
 before_install:
     - if [ $TRAVIS_OS_NAME = linux ]; then sudo apt-get update; else brew update; fi
