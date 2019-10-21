@@ -4456,6 +4456,18 @@ fluid_synth_start_voice(fluid_synth_t *synth, fluid_voice_t *voice)
     fluid_synth_api_exit(synth);
 }
 
+void
+fluid_synth_release_voice(fluid_synth_t *synth, fluid_voice_t *voice)
+{
+    fluid_return_if_fail(synth != NULL);
+    fluid_return_if_fail(voice != NULL);
+//  fluid_return_if_fail (fluid_synth_is_synth_thread (synth));
+    fluid_synth_api_enter(synth);
+
+    fluid_voice_release(voice);
+    fluid_synth_api_exit(synth);
+}
+
 /**
  * Add a SoundFont loader to the synth. This function takes ownership of \c loader
  * and frees it automatically upon \c synth destruction.

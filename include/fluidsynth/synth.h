@@ -280,6 +280,7 @@ FLUIDSYNTH_API fluid_voice_t *fluid_synth_alloc_voice(fluid_synth_t *synth,
         fluid_sample_t *sample,
         int channum, int key, int vel);
 FLUIDSYNTH_API void fluid_synth_start_voice(fluid_synth_t *synth, fluid_voice_t *voice);
+FLUIDSYNTH_API void fluid_synth_release_voice(fluid_synth_t *synth, fluid_voice_t *voice);
 FLUIDSYNTH_API void fluid_synth_get_voicelist(fluid_synth_t *synth,
         fluid_voice_t *buf[], int bufsize, int ID);
 FLUIDSYNTH_API int fluid_synth_handle_midi_event(void *data, fluid_midi_event_t *event);
